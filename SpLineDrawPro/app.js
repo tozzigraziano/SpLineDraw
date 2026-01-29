@@ -140,6 +140,8 @@ class SpLineDrawPro {
         this.saveBtn = document.getElementById('saveBtn');
         this.loadBtn = document.getElementById('loadBtn');
         this.fileInput = document.getElementById('fileInput');
+        this.importDxfBtn = document.getElementById('importDxfBtn');
+        this.dxfFileInput = document.getElementById('dxfFileInput');
         this.exportBtn = document.getElementById('exportBtn');
         this.robotType = document.getElementById('robotType');
         
@@ -266,6 +268,10 @@ class SpLineDrawPro {
         this.saveBtn.addEventListener('click', () => this.saveProject());
         this.loadBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.loadProject(e));
+        
+        // DXF Import
+        this.importDxfBtn.addEventListener('click', () => this.dxfFileInput.click());
+        this.dxfFileInput.addEventListener('change', (e) => this.importDxf(e));
         
         // Export
         this.exportBtn.addEventListener('click', () => this.exportRobotCode());
@@ -2400,6 +2406,530 @@ class SpLineDrawPro {
         
         reader.readAsText(file);
         event.target.value = '';
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DXF Import
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    importDxf(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const dxfContent = e.target.result;
+                const entities = this.parseDxf(dxfContent);
+                
+                if (entities.length === 0) {
+                    alert('Nessuna entità trovata nel file DXF');
+                    return;
+                }
+                
+                // Get bounding box of all entities
+                const bounds = this.getDxfBounds(entities);
+                
+                // Calculate scale and offset to fit in grid area with margin
+                const gridWidth = this.settings.maxAxis1 - this.settings.minAxis1;
+                const gridHeight = this.settings.maxAxis2 - this.settings.minAxis2;
+                const dxfWidth = bounds.maxX - bounds.minX;
+                const dxfHeight = bounds.maxY - bounds.minY;
+                
+                // Scale to fit with 10% margin
+                const margin = 0.1;
+                const scaleX = (gridWidth * (1 - margin * 2)) / dxfWidth;
+                const scaleY = (gridHeight * (1 - margin * 2)) / dxfHeight;
+                const scale = Math.min(scaleX, scaleY);
+                
+                // Calculate offset to center
+                const centerDxfX = (bounds.minX + bounds.maxX) / 2;
+                const centerDxfY = (bounds.minY + bounds.maxY) / 2;
+                const centerGridX = (this.settings.minAxis1 + this.settings.maxAxis1) / 2;
+                const centerGridY = (this.settings.minAxis2 + this.settings.maxAxis2) / 2;
+                
+                // Transform and create paths from entities
+                const transformPoint = (x, y) => ({
+                    x: centerGridX + (x - centerDxfX) * scale,
+                    y: centerGridY + (y - centerDxfY) * scale
+                });
+                
+                // Group entities into paths
+                let pathsCreated = 0;
+                
+                entities.forEach(entity => {
+                    let points = [];
+                    
+                    if (entity.type === 'LINE') {
+                        const start = transformPoint(entity.start.x, entity.start.y);
+                        const end = transformPoint(entity.end.x, entity.end.y);
+                        points = [start, end];
+                    }
+                    else if (entity.type === 'POLYLINE' || entity.type === 'LWPOLYLINE') {
+                        points = entity.vertices.map(v => transformPoint(v.x, v.y));
+                        // Close polyline if needed
+                        if (entity.closed && points.length > 2) {
+                            points.push({ ...points[0] });
+                        }
+                    }
+                    else if (entity.type === 'CIRCLE') {
+                        const center = transformPoint(entity.center.x, entity.center.y);
+                        const radius = entity.radius * scale;
+                        // Approximate circle with points
+                        const segments = Math.max(24, Math.round(radius * 2));
+                        for (let i = 0; i <= segments; i++) {
+                            const angle = (i / segments) * Math.PI * 2;
+                            points.push({
+                                x: center.x + Math.cos(angle) * radius,
+                                y: center.y + Math.sin(angle) * radius
+                            });
+                        }
+                    }
+                    else if (entity.type === 'ARC') {
+                        const center = transformPoint(entity.center.x, entity.center.y);
+                        const radius = entity.radius * scale;
+                        const startAngle = entity.startAngle * Math.PI / 180;
+                        const endAngle = entity.endAngle * Math.PI / 180;
+                        // Calculate arc length in degrees
+                        let angleDiff = endAngle - startAngle;
+                        if (angleDiff < 0) angleDiff += Math.PI * 2;
+                        const segments = Math.max(8, Math.round(angleDiff / (Math.PI / 12)));
+                        for (let i = 0; i <= segments; i++) {
+                            const angle = startAngle + (i / segments) * angleDiff;
+                            points.push({
+                                x: center.x + Math.cos(angle) * radius,
+                                y: center.y + Math.sin(angle) * radius
+                            });
+                        }
+                    }
+                    else if (entity.type === 'ELLIPSE') {
+                        const center = transformPoint(entity.center.x, entity.center.y);
+                        const majorLen = Math.hypot(entity.majorAxis.x, entity.majorAxis.y) * scale;
+                        const minorLen = majorLen * entity.ratio;
+                        const rotation = Math.atan2(entity.majorAxis.y, entity.majorAxis.x);
+                        const startParam = entity.startParam || 0;
+                        const endParam = entity.endParam || Math.PI * 2;
+                        let paramDiff = endParam - startParam;
+                        if (paramDiff <= 0) paramDiff += Math.PI * 2;
+                        const segments = Math.max(24, Math.round(paramDiff * 12));
+                        for (let i = 0; i <= segments; i++) {
+                            const param = startParam + (i / segments) * paramDiff;
+                            // Parametric ellipse
+                            const ex = majorLen * Math.cos(param);
+                            const ey = minorLen * Math.sin(param);
+                            // Rotate by ellipse rotation
+                            const rx = ex * Math.cos(rotation) - ey * Math.sin(rotation);
+                            const ry = ex * Math.sin(rotation) + ey * Math.cos(rotation);
+                            points.push({
+                                x: center.x + rx,
+                                y: center.y + ry
+                            });
+                        }
+                    }
+                    else if (entity.type === 'SPLINE') {
+                        // Approximate spline with control points
+                        if (entity.controlPoints && entity.controlPoints.length > 0) {
+                            points = entity.controlPoints.map(v => transformPoint(v.x, v.y));
+                        } else if (entity.fitPoints && entity.fitPoints.length > 0) {
+                            points = entity.fitPoints.map(v => transformPoint(v.x, v.y));
+                        }
+                    }
+                    
+                    // Create path if we have enough points
+                    if (points.length >= 2) {
+                        // Add velocity to points
+                        const processedPoints = points.map(p => ({
+                            x: p.x,
+                            y: p.y,
+                            velocity: this.settings.defaultPathSpeed
+                        }));
+                        
+                        const newPath = {
+                            id: Date.now() + pathsCreated,
+                            name: `DXF ${entity.type} ${pathsCreated + 1}`,
+                            rawPoints: [...processedPoints],
+                            processedPoints: processedPoints,
+                            color: this.layerColors[(this.paths.length + pathsCreated) % this.layerColors.length],
+                            visible: true,
+                            locked: false,
+                            velocity: this.settings.defaultPathSpeed
+                        };
+                        
+                        this.paths.push(newPath);
+                        pathsCreated++;
+                    }
+                });
+                
+                if (pathsCreated > 0) {
+                    this.activePathIndex = this.paths.length - 1;
+                    this.transitions = []; // Reset transitions
+                    
+                    this.updateLayersList();
+                    this.updatePointsTable();
+                    this.updateTransitionsList();
+                    this.redrawPaths();
+                    
+                    alert(`Importati ${pathsCreated} percorsi dal file DXF`);
+                } else {
+                    alert('Nessun percorso creato dal file DXF');
+                }
+                
+            } catch (error) {
+                console.error('Errore DXF:', error);
+                alert('Errore nell\'importazione del DXF: ' + error.message);
+            }
+        };
+        
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    parseDxf(content) {
+        const entities = [];
+        const lines = content.split(/\r?\n/);
+        let i = 0;
+        
+        console.log('DXF Parser: Totale linee:', lines.length);
+        
+        // Helper to get next group code/value pair
+        const nextPair = () => {
+            if (i >= lines.length - 1) return null;
+            const code = parseInt(lines[i].trim());
+            const value = lines[i + 1] ? lines[i + 1].trim() : '';
+            i += 2;
+            return { code, value };
+        };
+        
+        // Helper to peek current pair without advancing
+        const peekPair = () => {
+            if (i >= lines.length - 1) return null;
+            const code = parseInt(lines[i].trim());
+            const value = lines[i + 1] ? lines[i + 1].trim() : '';
+            return { code, value };
+        };
+        
+        // Find ENTITIES section - search for "ENTITIES" as section name
+        let foundEntities = false;
+        while (i < lines.length - 1) {
+            const line = lines[i].trim();
+            const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+            
+            // Look for SECTION followed by ENTITIES
+            if (line === '0' && nextLine === 'SECTION') {
+                i += 2;
+                // Check if next pair is (2, ENTITIES)
+                const pair = peekPair();
+                if (pair && pair.code === 2 && pair.value === 'ENTITIES') {
+                    i += 2; // Skip past the ENTITIES name
+                    foundEntities = true;
+                    console.log('DXF Parser: Trovata sezione ENTITIES alla linea', i);
+                    break;
+                }
+            } else {
+                i++;
+            }
+        }
+        
+        if (!foundEntities) {
+            console.log('DXF Parser: Sezione ENTITIES non trovata, cerco entità direttamente...');
+            
+            // Debug: mostra alcune linee del file per capire il formato
+            console.log('DXF Parser: Prime 20 linee del file:');
+            for (let j = 0; j < Math.min(40, lines.length); j++) {
+                console.log(`  ${j}: "${lines[j]}"`);
+            }
+            
+            // Cerca tutte le occorrenze di "0" seguito da tipo entità
+            i = 0;
+            const entityTypes = ['LINE', 'CIRCLE', 'ARC', 'POLYLINE', 'LWPOLYLINE', 'SPLINE', 'ELLIPSE', 
+                                 'POINT', 'SOLID', '3DFACE', 'TEXT', 'MTEXT', 'INSERT', 'HATCH', 
+                                 'DIMENSION', 'LEADER', 'TRACE', '3DSOLID', 'REGION', 'BODY'];
+            
+            while (i < lines.length - 1) {
+                const line = lines[i].trim();
+                const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+                
+                // Cerca "0" seguito da un tipo di entità noto
+                if (line === '0' && entityTypes.includes(nextLine)) {
+                    console.log('DXF Parser: Trovata prima entità', nextLine, 'alla linea', i);
+                    foundEntities = true;
+                    break;
+                }
+                
+                // Cerca anche "ENTITIES" come valore su una linea (alcuni formati)
+                if (nextLine === 'ENTITIES' || line === 'ENTITIES') {
+                    console.log('DXF Parser: Trovato ENTITIES alla linea', i);
+                    // Cerca la prossima entità
+                    i++;
+                    continue;
+                }
+                
+                i++;
+            }
+        }
+        
+        if (!foundEntities) {
+            console.log('DXF Parser: Nessuna entità trovata nel file');
+            
+            // Ultimo tentativo: cerca qualsiasi coordinata nel file
+            console.log('DXF Parser: Cerco coordinate nel file...');
+            let foundCoords = false;
+            for (let j = 0; j < lines.length - 1; j++) {
+                const code = parseInt(lines[j].trim());
+                if (code === 10 || code === 11) {
+                    console.log(`DXF Parser: Trovato codice coordinata ${code} alla linea ${j}: ${lines[j+1]}`);
+                    foundCoords = true;
+                    if (foundCoords) break;
+                }
+            }
+            
+            return entities;
+        }
+        
+        // Parse entities
+        let currentEntity = null;
+        let vertexList = [];
+        let controlPoints = [];
+        let fitPoints = [];
+        
+        while (i < lines.length - 1) {
+            const pair = nextPair();
+            if (!pair) break;
+            
+            // End of ENTITIES section
+            if (pair.code === 0 && pair.value === 'ENDSEC') {
+                console.log('DXF Parser: Fine sezione ENTITIES');
+                break;
+            }
+            if (pair.code === 0 && pair.value === 'EOF') {
+                console.log('DXF Parser: Fine file');
+                break;
+            }
+            
+            // New entity
+            if (pair.code === 0) {
+                // Save previous entity
+                if (currentEntity) {
+                    if (currentEntity.type === 'POLYLINE' || currentEntity.type === 'LWPOLYLINE') {
+                        currentEntity.vertices = [...vertexList];
+                    }
+                    if (currentEntity.type === 'SPLINE') {
+                        currentEntity.controlPoints = [...controlPoints];
+                        currentEntity.fitPoints = [...fitPoints];
+                    }
+                    if (this.isValidEntity(currentEntity)) {
+                        entities.push(currentEntity);
+                        console.log('DXF Parser: Salvata entità', currentEntity.type);
+                    }
+                }
+                
+                vertexList = [];
+                controlPoints = [];
+                fitPoints = [];
+                
+                // Start new entity
+                if (pair.value === 'LINE') {
+                    currentEntity = { type: 'LINE', start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
+                }
+                else if (pair.value === 'POLYLINE') {
+                    currentEntity = { type: 'POLYLINE', vertices: [], closed: false };
+                }
+                else if (pair.value === 'LWPOLYLINE') {
+                    currentEntity = { type: 'LWPOLYLINE', vertices: [], closed: false };
+                }
+                else if (pair.value === 'CIRCLE') {
+                    currentEntity = { type: 'CIRCLE', center: { x: 0, y: 0 }, radius: 0 };
+                }
+                else if (pair.value === 'ARC') {
+                    currentEntity = { type: 'ARC', center: { x: 0, y: 0 }, radius: 0, startAngle: 0, endAngle: 360 };
+                }
+                else if (pair.value === 'SPLINE') {
+                    currentEntity = { type: 'SPLINE', controlPoints: [], fitPoints: [], closed: false };
+                }
+                else if (pair.value === 'ELLIPSE') {
+                    currentEntity = { type: 'ELLIPSE', center: { x: 0, y: 0 }, majorAxis: { x: 0, y: 0 }, ratio: 1, startParam: 0, endParam: Math.PI * 2 };
+                }
+                else if (pair.value === 'VERTEX') {
+                    // Part of POLYLINE - add new vertex
+                    vertexList.push({ x: 0, y: 0 });
+                }
+                else if (pair.value === 'SEQEND') {
+                    // End of POLYLINE vertices - don't reset currentEntity
+                    continue;
+                }
+                else {
+                    // Unknown entity type - keep currentEntity for VERTEX handling
+                    if (pair.value !== 'VERTEX' && pair.value !== 'SEQEND') {
+                        currentEntity = null;
+                    }
+                }
+                continue;
+            }
+            
+            // Parse entity properties
+            if (!currentEntity) continue;
+            
+            // LINE
+            if (currentEntity.type === 'LINE') {
+                if (pair.code === 10) currentEntity.start.x = parseFloat(pair.value);
+                if (pair.code === 20) currentEntity.start.y = parseFloat(pair.value);
+                if (pair.code === 11) currentEntity.end.x = parseFloat(pair.value);
+                if (pair.code === 21) currentEntity.end.y = parseFloat(pair.value);
+            }
+            // CIRCLE
+            else if (currentEntity.type === 'CIRCLE') {
+                if (pair.code === 10) currentEntity.center.x = parseFloat(pair.value);
+                if (pair.code === 20) currentEntity.center.y = parseFloat(pair.value);
+                if (pair.code === 40) currentEntity.radius = parseFloat(pair.value);
+            }
+            // ARC
+            else if (currentEntity.type === 'ARC') {
+                if (pair.code === 10) currentEntity.center.x = parseFloat(pair.value);
+                if (pair.code === 20) currentEntity.center.y = parseFloat(pair.value);
+                if (pair.code === 40) currentEntity.radius = parseFloat(pair.value);
+                if (pair.code === 50) currentEntity.startAngle = parseFloat(pair.value);
+                if (pair.code === 51) currentEntity.endAngle = parseFloat(pair.value);
+            }
+            // ELLIPSE
+            else if (currentEntity.type === 'ELLIPSE') {
+                if (pair.code === 10) currentEntity.center.x = parseFloat(pair.value);
+                if (pair.code === 20) currentEntity.center.y = parseFloat(pair.value);
+                if (pair.code === 11) currentEntity.majorAxis.x = parseFloat(pair.value);
+                if (pair.code === 21) currentEntity.majorAxis.y = parseFloat(pair.value);
+                if (pair.code === 40) currentEntity.ratio = parseFloat(pair.value);
+                if (pair.code === 41) currentEntity.startParam = parseFloat(pair.value);
+                if (pair.code === 42) currentEntity.endParam = parseFloat(pair.value);
+            }
+            // LWPOLYLINE
+            else if (currentEntity.type === 'LWPOLYLINE') {
+                if (pair.code === 70) currentEntity.closed = (parseInt(pair.value) & 1) !== 0;
+                if (pair.code === 10) {
+                    vertexList.push({ x: parseFloat(pair.value), y: 0 });
+                }
+                if (pair.code === 20 && vertexList.length > 0) {
+                    vertexList[vertexList.length - 1].y = parseFloat(pair.value);
+                }
+            }
+            // POLYLINE
+            else if (currentEntity.type === 'POLYLINE') {
+                if (pair.code === 70) currentEntity.closed = (parseInt(pair.value) & 1) !== 0;
+            }
+            // SPLINE
+            else if (currentEntity.type === 'SPLINE') {
+                if (pair.code === 70) currentEntity.closed = (parseInt(pair.value) & 1) !== 0;
+                if (pair.code === 10) controlPoints.push({ x: parseFloat(pair.value), y: 0 });
+                if (pair.code === 20 && controlPoints.length > 0) {
+                    controlPoints[controlPoints.length - 1].y = parseFloat(pair.value);
+                }
+                if (pair.code === 11) fitPoints.push({ x: parseFloat(pair.value), y: 0 });
+                if (pair.code === 21 && fitPoints.length > 0) {
+                    fitPoints[fitPoints.length - 1].y = parseFloat(pair.value);
+                }
+            }
+            
+            // VERTEX coordinates (for POLYLINE)
+            if (vertexList.length > 0) {
+                const lastVertex = vertexList[vertexList.length - 1];
+                if (pair.code === 10) lastVertex.x = parseFloat(pair.value);
+                if (pair.code === 20) lastVertex.y = parseFloat(pair.value);
+            }
+        }
+        
+        // Don't forget last entity
+        if (currentEntity) {
+            if (currentEntity.type === 'POLYLINE' || currentEntity.type === 'LWPOLYLINE') {
+                currentEntity.vertices = [...vertexList];
+            }
+            if (currentEntity.type === 'SPLINE') {
+                currentEntity.controlPoints = [...controlPoints];
+                currentEntity.fitPoints = [...fitPoints];
+            }
+            if (this.isValidEntity(currentEntity)) {
+                entities.push(currentEntity);
+                console.log('DXF Parser: Salvata ultima entità', currentEntity.type);
+            }
+        }
+        
+        console.log('DXF Parser: Totale entità trovate:', entities.length);
+        return entities;
+    }
+
+    isValidEntity(entity) {
+        if (!entity) return false;
+        
+        if (entity.type === 'LINE') {
+            return entity.start.x !== undefined && entity.start.y !== undefined &&
+                   entity.end.x !== undefined && entity.end.y !== undefined;
+        }
+        if (entity.type === 'CIRCLE' || entity.type === 'ARC') {
+            return entity.center.x !== undefined && entity.center.y !== undefined && entity.radius > 0;
+        }
+        if (entity.type === 'ELLIPSE') {
+            return entity.center.x !== undefined && entity.center.y !== undefined &&
+                   (entity.majorAxis.x !== 0 || entity.majorAxis.y !== 0);
+        }
+        if (entity.type === 'POLYLINE' || entity.type === 'LWPOLYLINE') {
+            return entity.vertices && entity.vertices.length >= 2;
+        }
+        if (entity.type === 'SPLINE') {
+            return (entity.controlPoints && entity.controlPoints.length >= 2) ||
+                   (entity.fitPoints && entity.fitPoints.length >= 2);
+        }
+        return false;
+    }
+
+    getDxfBounds(entities) {
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        
+        const updateBounds = (x, y) => {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        };
+        
+        entities.forEach(entity => {
+            if (entity.type === 'LINE') {
+                updateBounds(entity.start.x, entity.start.y);
+                updateBounds(entity.end.x, entity.end.y);
+            }
+            else if (entity.type === 'CIRCLE') {
+                updateBounds(entity.center.x - entity.radius, entity.center.y - entity.radius);
+                updateBounds(entity.center.x + entity.radius, entity.center.y + entity.radius);
+            }
+            else if (entity.type === 'ARC') {
+                // Simplified: use full circle bounds
+                updateBounds(entity.center.x - entity.radius, entity.center.y - entity.radius);
+                updateBounds(entity.center.x + entity.radius, entity.center.y + entity.radius);
+            }
+            else if (entity.type === 'ELLIPSE') {
+                const majorLen = Math.hypot(entity.majorAxis.x, entity.majorAxis.y);
+                const minorLen = majorLen * entity.ratio;
+                const maxR = Math.max(majorLen, minorLen);
+                updateBounds(entity.center.x - maxR, entity.center.y - maxR);
+                updateBounds(entity.center.x + maxR, entity.center.y + maxR);
+            }
+            else if (entity.type === 'POLYLINE' || entity.type === 'LWPOLYLINE') {
+                entity.vertices.forEach(v => updateBounds(v.x, v.y));
+            }
+            else if (entity.type === 'SPLINE') {
+                if (entity.controlPoints) {
+                    entity.controlPoints.forEach(v => updateBounds(v.x, v.y));
+                }
+                if (entity.fitPoints) {
+                    entity.fitPoints.forEach(v => updateBounds(v.x, v.y));
+                }
+            }
+        });
+        
+        // Handle case where no valid bounds found
+        if (minX === Infinity) {
+            minX = minY = 0;
+            maxX = maxY = 100;
+        }
+        
+        return { minX, minY, maxX, maxY };
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
