@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>SpLine Draw Pro - Multi-Path Robot Trajectory Designer</title>
+    <link rel="stylesheet" href="../Source/fonts/material-symbols.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <div class="header-top">
+                <div class="brand">
+                    <img src="CTF_Round@0.5x.png" alt="CTF" class="brand-logo">
+                    <h1>SpLine Draw Pro</h1>
+                </div>
+                <div class="header-actions">
+                    <button id="settingsBtn" class="btn btn-icon" title="Impostazioni">
+                        <span class="material-symbols-outlined">settings</span>
+                    </button>
+                    <div class="file-actions">
+                        <button id="saveBtn" class="btn btn-icon" title="Salva Progetto">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                        <button id="loadBtn" class="btn btn-icon" title="Carica Progetto">
+                            <span class="material-symbols-outlined">folder_open</span>
+                        </button>
+                        <input type="file" id="fileInput" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="toolbar">
+                <!-- Tools -->
+                <div class="toolbar-section">
+                    <span class="section-label">Strumenti</span>
+                    <div class="tool-group">
+                        <button id="selectBtn" class="btn tool-btn" data-tool="select" title="Selezione">
+                            <span class="material-symbols-outlined">ads_click</span>
+                        </button>
+                        <button id="pathBtn" class="btn tool-btn active" data-tool="path" title="Disegna Percorso">
+                            <span class="material-symbols-outlined">draw</span>
+                        </button>
+                        <button id="rectBtn" class="btn tool-btn" data-tool="rectangle" title="Rettangolo">
+                            <span class="material-symbols-outlined">square</span>
+                        </button>
+                        <button id="circleBtn" class="btn tool-btn" data-tool="circle" title="Cerchio">
+                            <span class="material-symbols-outlined">circle</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Program Selector -->
+                <div class="toolbar-section">
+                    <span class="section-label">Programma</span>
+                    <div class="program-group">
+                        <span id="programBasename" class="program-name">program</span>
+                        <select id="programIndex" class="program-select">
+                            <option value="1">1</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Export -->
+                <div class="toolbar-section export-section">
+                    <span class="section-label">Esporta</span>
+                    <div class="export-group">
+                        <button id="exportBtn" class="btn btn-export" title="Esporta">
+                            <span class="material-symbols-outlined">download</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Playback -->
+                <div class="toolbar-section">
+                    <span class="section-label">Riproduzione</span>
+                    <div class="playback-group">
+                        <button id="playBtn" class="btn btn-play" title="Play">
+                            <span class="material-symbols-outlined">play_arrow</span>
+                        </button>
+                        <button id="pauseBtn" class="btn btn-play" style="display: none;" title="Pausa">
+                            <span class="material-symbols-outlined">pause</span>
+                        </button>
+                        <button id="stopBtn" class="btn btn-play" title="Stop">
+                            <span class="material-symbols-outlined">stop</span>
+                        </button>
+                        <input type="range" id="progressSlider" min="0" max="1000" step="1" value="0" class="progress-slider">
+                        <span id="timeDisplay" class="time-display">00:00</span>
+                    </div>
+                </div>
+                
+                <!-- Clear Actions -->
+                <div class="toolbar-section clear-section">
+                    <span class="section-label">Cancella</span>
+                    <div class="clear-group">
+                        <button id="clearPathsBtn" class="btn btn-warning" title="Cancella tutti i percorsi">
+                            <span class="material-symbols-outlined">delete_sweep</span>
+                            Percorsi
+                        </button>
+                        <button id="clearShapesBtn2" class="btn btn-warning" title="Cancella tutte le geometrie">
+                            <span class="material-symbols-outlined">delete</span>
+                            Geometrie
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Coordinates -->
+                <div class="toolbar-section coordinates-section">
+                    <span id="coordinates" class="coordinates">X: 0.0 | Y: 0.0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div class="workspace">
+                <!-- Canvas Container -->
+                <div id="canvasContainer" class="canvas-container">
+                    <canvas id="gridCanvas"></canvas>
+                    <canvas id="shapeCanvas"></canvas>
+                    <canvas id="pathCanvas"></canvas>
+                    <canvas id="previewCanvas"></canvas>
+                    <canvas id="animationCanvas"></canvas>
+                </div>
+                
+                <!-- Side Panel -->
+                <div id="sidePanel" class="side-panel">
+                    <!-- Tabs -->
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" data-tab="layers">
+                            <span class="material-symbols-outlined">layers</span>
+                            Livelli
+                        </button>
+                        <button class="tab-btn" data-tab="points">
+                            <span class="material-symbols-outlined">scatter_plot</span>
+                            Punti
+                        </button>
+                        <button class="tab-btn" data-tab="transitions">
+                            <span class="material-symbols-outlined">route</span>
+                            Raccordi
+                        </button>
+                        <button class="tab-btn" data-tab="shapes">
+                            <span class="material-symbols-outlined">category</span>
+                            Geometrie
+                        </button>
+                    </div>
+                    
+                    <!-- Tab Contents -->
+                    <div class="panel-content">
+                        <!-- Layers Tab -->
+                        <div id="layers-tab" class="tab-content active">
+                            <div class="tab-header">
+                                <span class="tab-title">Percorsi</span>
+                                <div class="tab-actions">
+                                    <button id="addLayerBtn" class="btn btn-small" title="Aggiungi Percorso">
+                                        <span class="material-symbols-outlined">add</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="layersList" class="layers-list">
+                                <!-- Layers will be populated here -->
+                            </div>
+                            <div class="layer-stats">
+                                <span id="totalPathsCount">0 percorsi</span>
+                                <span id="totalPointsCount">0 punti totali</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Points Tab -->
+                        <div id="points-tab" class="tab-content">
+                            <div class="tab-header">
+                                <span class="tab-title">Punti Percorso</span>
+                                <select id="pointsPathSelect" class="path-select">
+                                    <option value="all">Tutti i percorsi</option>
+                                </select>
+                            </div>
+                            <div class="points-toolbar">
+                                <div class="bulk-action">
+                                    <label>Velocità:</label>
+                                    <input type="number" id="bulkVelocity" placeholder="mm/s" min="0" step="10">
+                                    <button id="applyVelocityBtn" class="btn btn-small">Applica</button>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table id="pointsTable">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="selectAllPoints"></th>
+                                            <th>#</th>
+                                            <th>X (mm)</th>
+                                            <th>Y (mm)</th>
+                                            <th>Vel (mm/s)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pointsTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Transitions Tab -->
+                        <div id="transitions-tab" class="tab-content">
+                            <div class="tab-header">
+                                <span class="tab-title">Raccordi tra Percorsi</span>
+                            </div>
+                            <div class="transitions-info">
+                                <p class="info-text">I raccordi collegano percorsi consecutivi. Ogni raccordo ha almeno 2 punti obbligatori + arrivo.</p>
+                            </div>
+                            <div class="transition-defaults">
+                                <div class="default-row">
+                                    <label>Offset Default (asse perpendicolare):</label>
+                                    <input type="number" id="defaultTransitionOffset" value="50" step="5" min="0"> mm
+                                </div>
+                                <div class="default-row">
+                                    <label>Velocità Raccordi:</label>
+                                    <input type="number" id="defaultTransitionVelocity" value="100" step="10" min="1"> mm/s
+                                </div>
+                            </div>
+                            <div id="transitionsList" class="transitions-list">
+                                <!-- Transitions will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Shapes Tab -->
+                        <div id="shapes-tab" class="tab-content">
+                            <div class="tab-header">
+                                <span class="tab-title">Geometrie di Riferimento</span>
+                                <button id="clearShapesBtn" class="btn btn-small btn-warning" title="Elimina tutte">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                            </div>
+                            <div class="table-container">
+                                <table id="shapesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Tipo</th>
+                                            <th>X</th>
+                                            <th>Y</th>
+                                            <th>Dim.</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shapesTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Impostazioni</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Piano di Lavoro -->
+                    <div class="settings-section">
+                        <h3>Piano di Lavoro</h3>
+                        <div class="setting-row">
+                            <label for="workPlane">Piano:</label>
+                            <select id="workPlane">
+                                <option value="XY">XY</option>
+                                <option value="YZ">YZ</option>
+                                <option value="XZ">XZ</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Griglia -->
+                    <div class="settings-section">
+                        <h3>Griglia</h3>
+                        <div class="setting-row">
+                            <label id="minAxis1Label" for="minAxis1">Min Asse 1 (mm):</label>
+                            <input type="number" id="minAxis1" value="-100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label id="maxAxis1Label" for="maxAxis1">Max Asse 1 (mm):</label>
+                            <input type="number" id="maxAxis1" value="100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label id="minAxis2Label" for="minAxis2">Min Asse 2 (mm):</label>
+                            <input type="number" id="minAxis2" value="-100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label id="maxAxis2Label" for="maxAxis2">Max Asse 2 (mm):</label>
+                            <input type="number" id="maxAxis2" value="100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label for="gridSize">Dimensione Griglia (mm):</label>
+                            <input type="number" id="gridSize" value="10" min="1" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="snapSize">Snap (mm):</label>
+                            <input type="number" id="snapSize" value="1" min="0.1" step="0.1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="enableSnap">Abilita Snap:</label>
+                            <input type="checkbox" id="enableSnap" checked>
+                        </div>
+                    </div>
+                    
+                    <!-- Elaborazione Percorso -->
+                    <div class="settings-section">
+                        <h3>Elaborazione Percorso</h3>
+                        <div class="setting-row">
+                            <label for="smoothingFactor">Smoothing:</label>
+                            <input type="range" id="smoothingFactor" min="0" max="1" step="0.1" value="0.5">
+                            <span id="smoothingValue">0.5</span>
+                        </div>
+                        <div class="setting-row">
+                            <label for="minPointDistance">Distanza Min Punti (mm):</label>
+                            <input type="number" id="minPointDistance" value="2" min="0.5" step="0.5">
+                        </div>
+                        <div class="setting-row">
+                            <label for="maxPointDistance">Distanza Max Punti (mm):</label>
+                            <input type="number" id="maxPointDistance" value="10" min="1" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="curvatureThreshold">Soglia Curvatura:</label>
+                            <input type="number" id="curvatureThreshold" value="0.1" min="0.01" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <!-- Velocità -->
+                    <div class="settings-section">
+                        <h3>Velocità Default</h3>
+                        <div class="setting-row">
+                            <label for="defaultPathSpeed">Velocità Percorsi (mm/s):</label>
+                            <input type="number" id="defaultPathSpeed" value="30" min="1" step="5">
+                        </div>
+                        <div class="setting-row">
+                            <label for="defaultTransitionSpeed">Velocità Raccordi (mm/s):</label>
+                            <input type="number" id="defaultTransitionSpeed" value="100" min="1" step="10">
+                        </div>
+                    </div>
+                    
+                    <!-- Esportazione -->
+                    <div class="settings-section">
+                        <h3>Esportazione</h3>
+                        <div class="setting-row">
+                            <label for="robotType">Tipo Robot:</label>
+                            <select id="robotType">
+                                <option value="kuka">KUKA</option>
+                                <option value="fanuc" disabled>FANUC</option>
+                                <option value="abb" disabled>ABB</option>
+                                <option value="yaskawa" disabled>YASKAWA</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label for="basename">Nome Base Programma:</label>
+                            <input type="text" id="basename" value="program" maxlength="20">
+                        </div>
+                        <div class="setting-row">
+                            <label for="maxProgramNum">Numero Max Programma:</label>
+                            <input type="number" id="maxProgramNum" value="999" min="1" max="9999">
+                        </div>
+                        
+                        <!-- KUKA Specific Parameters -->
+                        <div id="kukaParams" class="robot-params">
+                            <h4>Parametri KUKA E6POS</h4>
+                            <div class="setting-row">
+                                <label for="kukaS">S (Status):</label>
+                                <input type="number" id="kukaS" value="2" min="0" max="7">
+                                <span class="hint">Configurazione braccio (0-7)</span>
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaT">T (Turn):</label>
+                                <input type="number" id="kukaT" value="35" min="0" max="255">
+                                <span class="hint">Configurazione assi (0-255)</span>
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaA">A (Rotazione Z):</label>
+                                <input type="number" id="kukaA" value="0" step="0.1">
+                                <span class="hint">gradi</span>
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaB">B (Rotazione Y):</label>
+                                <input type="number" id="kukaB" value="0" step="0.1">
+                                <span class="hint">gradi</span>
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaC">C (Rotazione X):</label>
+                                <input type="number" id="kukaC" value="0" step="0.1">
+                                <span class="hint">gradi</span>
+                            </div>
+                            
+                            <h4>Tool e Base</h4>
+                            <div class="setting-row">
+                                <label for="kukaTool">TOOL_DATA[]:</label>
+                                <input type="number" id="kukaTool" value="1" min="1" max="16">
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaBase">BASE_DATA[]:</label>
+                                <input type="number" id="kukaBase" value="1" min="1" max="32">
+                            </div>
+                            
+                            <h4>Uscita Digitale Percorso</h4>
+                            <div class="setting-row">
+                                <label for="kukaOutputEnabled">Abilita Uscita:</label>
+                                <input type="checkbox" id="kukaOutputEnabled">
+                            </div>
+                            <div class="setting-row">
+                                <label for="kukaOutputId">Numero Uscita ($OUT[]):</label>
+                                <input type="number" id="kukaOutputId" value="1" min="1" max="4096">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Colori -->
+                    <div class="settings-section">
+                        <h3>Colori</h3>
+                        <div class="setting-row">
+                            <label for="pathColor">Colore Percorso Disegnato:</label>
+                            <input type="color" id="pathColor" value="#666666">
+                        </div>
+                        <div class="setting-row">
+                            <label for="processedColor">Colore Percorso Elaborato:</label>
+                            <input type="color" id="processedColor" value="#00ff88">
+                        </div>
+                        <div class="setting-row">
+                            <label for="shapeColor">Colore Geometrie:</label>
+                            <input type="color" id="shapeColor" value="#4a90d9">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="resetSettings" class="btn btn-secondary">Reset</button>
+                    <button id="saveSettings" class="btn btn-primary">Salva</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Transition Editor Modal -->
+        <div id="transitionModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Modifica Raccordo</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-row">
+                        <label>Da Percorso:</label>
+                        <select id="transitionFrom"></select>
+                    </div>
+                    <div class="setting-row">
+                        <label>A Percorso:</label>
+                        <select id="transitionTo"></select>
+                    </div>
+                    <h4>Movimenti Intermedi</h4>
+                    <div id="transitionMoves" class="transition-moves">
+                        <!-- Dynamic moves will be added here -->
+                    </div>
+                    <button id="addMoveBtn" class="btn btn-small">
+                        <span class="material-symbols-outlined">add</span>
+                        Aggiungi Movimento
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelTransition" class="btn btn-secondary">Annulla</button>
+                    <button id="saveTransition" class="btn btn-primary">Salva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

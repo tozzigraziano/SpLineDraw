@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>SpLine Generator - Generatore di Spline su Griglia Cartesiana</title>
+    <link rel="stylesheet" href="fonts/material-symbols.css">
+    <link rel="stylesheet" href="styles.css?v3.9">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>SpLine Generator</h1>
+            <div class="toolbar">
+                <button id="settingsBtn" class="btn"><span class="material-symbols-outlined">settings</span> Impostazioni</button>
+                <button id="darkModeBtn" class="btn" title="Modalità scura"><span class="material-symbols-outlined">dark_mode</span></button>
+                <div class="file-group">
+                    <label style="color: rgba(255,255,255,0.9); font-size: 14px; margin-right: 8px;">Programma:</label>
+                    <span id="programBasename" style="color: rgba(255,255,255,0.9); font-size: 14px; margin-right: 8px;">program</span>
+                    <select id="programIndex" style="padding: 6px 10px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(255,255,255,0.2); color: white; font-size: 14px; margin-right: 8px;">
+                        <option value="1">1</option>
+                    </select>
+                    <button id="copyBtn" class="btn" title="Copia programma corrente in altro slot"><span class="material-symbols-outlined">content_copy</span> Copia</button>
+                    <button id="saveBtn" class="btn"><span class="material-symbols-outlined">save</span> Salva Progetto</button>
+                    <button id="loadBtn" class="btn"><span class="material-symbols-outlined">folder_open</span> Carica Progetto</button>
+                    <input type="file" id="fileInput" accept=".json" style="display: none;">
+                </div>
+                <div class="export-group">
+                    <select id="robotType" class="robot-select">
+                        <option value="kuka">KUKA KRL</option>
+                        <option value="fanuc" disabled>FANUC (futuro)</option>
+                        <option value="abb" disabled>ABB RAPID (futuro)</option>
+                        <option value="motoman" disabled>MOTOMAN INFORM (futuro)</option>
+                    </select>
+                    <button id="exportBtn" class="btn btn-export">🤖 Esporta Robot</button>
+                </div>
+                <div class="clear-group">
+                    <button id="clearSplineBtn" class="btn btn-warning">🗑️ Pulisci Spline</button>
+                    <button id="clearShapesBtn" class="btn btn-warning">🗑️ Pulisci Geometrie</button>
+                </div>
+                <div class="tool-group">
+                    <span>Strumenti:</span>
+                    <button id="selectBtn" class="btn tool-btn" data-tool="select" title="Strumento Selezione"><span class="material-symbols-outlined">ads_click</span></button>
+                    <button id="splineBtn" class="btn tool-btn active" data-tool="spline" title="Strumento Spline"><span class="material-symbols-outlined">draw</span></button>
+                    <button id="rectBtn" class="btn tool-btn" data-tool="rectangle" title="Strumento Rettangolo"><span class="material-symbols-outlined">square</span></button>
+                    <button id="circleBtn" class="btn tool-btn" data-tool="circle" title="Strumento Cerchio"><span class="material-symbols-outlined">circle</span></button>
+                </div>
+                <div class="play-group">
+                    <div class="playback-row">
+                        <button id="playBtn" class="btn play-btn"><span class="material-symbols-outlined">play_arrow</span></button>
+                        <button id="pauseBtn" class="btn play-btn" style="display: none;"><span class="material-symbols-outlined">pause</span></button>
+                        <button id="stopBtn" class="btn play-btn"><span class="material-symbols-outlined">stop</span></button>
+                        <input type="range" id="progressSlider" min="0" max="1000" step="1" value="0" class="progress-slider">
+                        <div class="speed-control">
+                            <span style="font-size: 11px; margin-right: 4px;">Vel:</span>
+                            <input type="range" id="speedSlider" min="0.05" max="2" step="0.05" value="1" class="speed-slider">
+                            <span id="speedDisplay" class="speed-display">1.00x</span>
+                        </div>
+                        <div class="time-indicator">
+                            <span id="timeDisplay">00:00.00 / 00:00.00</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="info">
+                    <span id="coordinates">X: 0 mm, Y: 0 mm</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="workspace">
+                <div id="canvasContainer">
+                    <canvas id="gridCanvas" width="1200" height="800"></canvas>
+                    <canvas id="shapeCanvas" width="1200" height="800"></canvas>
+                    <canvas id="splineCanvas" width="1200" height="800"></canvas>
+                    <canvas id="animationCanvas" width="1200" height="800"></canvas>
+                </div>
+                
+                <div id="sidePanel" class="side-panel">
+                    <div class="panel-header">
+                        <div class="description-panel-group">
+                            <label for="programDescription" style="font-size: 13px; margin-bottom: 6px; display: block; font-weight: 500;">Descrizione programma:</label>
+                            <textarea id="programDescription" placeholder="Inserisci una descrizione per questo programma..." style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; margin-bottom: 12px;"></textarea>
+                        </div>
+                        <div class="tab-container">
+                            <button class="tab-btn active" data-tab="spline-tab">📏 Punti Spline</button>
+                            <button class="tab-btn" data-tab="sequences-tab">🎯 Sequenze</button>
+                            <button class="tab-btn" data-tab="shapes-tab">📐 Geometrie</button>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-content">
+                        <!-- Tab Punti Spline -->
+                        <div id="spline-tab" class="tab-content active">
+                            <div class="tab-toolbar">
+                                <div class="spline-controls">
+                                    <label style="width: 200px;">Velocità selezionati:</label>
+                                    <input type="number" id="bulkVelocity" placeholder="mm/s" min="0" step="10" value="30">
+                                    <button id="applyBulkVelocity" class="btn btn-small">Applica</button>
+                                </div>
+                                <div class="spline-controls">
+                                    <label style="width: 200px;" id="bulkXLabel">X selezionati:</label>
+                                    <input type="number" id="bulkX" placeholder="mm" step="0.5" value="0">
+                                    <button id="setBulkX" class="btn btn-small">Imposta</button>
+                                    <button id="offsetBulkX" class="btn btn-small">Offset</button>
+                                </div>
+                                <div class="spline-controls">
+                                    <label style="width: 200px;" id="bulkYLabel">Y selezionati:</label>
+                                    <input type="number" id="bulkY" placeholder="mm" step="0.5" value="0">
+                                    <button id="setBulkY" class="btn btn-small">Imposta</button>
+                                    <button id="offsetBulkY" class="btn btn-small">Offset</button>
+                                </div>
+                                <div class="spline-info">
+                                    <span id="pointCount">0 punti</span>
+                                    <span id="selectedCount">0 selezionati</span>
+                                    <button id="selectSequenceBtn" class="btn btn-small" title="Seleziona sequenza corrente con stessa velocità">
+                                        <span class="material-symbols-outlined">select_all</span> Seleziona Sequenza
+                                    </button>
+                                    <button id="deleteSelectedBtn" class="btn btn-small btn-danger" style="display: none;">
+                                        <span class="material-symbols-outlined">delete</span> Elimina selezionati
+                                    </button>
+                                    <span id="splineLength">Lunghezza: 0.0 mm</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table id="splineTable">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="selectAllPoints"></th>
+                                            <th>ID</th>
+                                            <th>X (mm)</th>
+                                            <th>Y (mm)</th>
+                                            <th>Velocità (mm/s)</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="splineTableBody">
+                                        <!-- Punti spline verranno inseriti qui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Sequenze -->
+                        <div id="sequences-tab" class="tab-content">
+                            <div class="tab-toolbar">
+                                <div class="sequences-info">
+                                    <span id="sequencesCount">0 sequenze</span>
+                                    <button id="refreshSequencesBtn" class="btn btn-small">
+                                        <span class="material-symbols-outlined">refresh</span> Aggiorna
+                                    </button>
+                                    <label style="margin-left: 20px;">
+                                        <input type="checkbox" id="highlightSequencesOnHover" checked>
+                                        Evidenzia al passaggio del mouse
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <div id="sequencesContainer">
+                                    <!-- Sequenze verranno inserite qui -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Geometrie -->
+                        <div id="shapes-tab" class="tab-content">
+                            <div class="tab-toolbar">
+                                <div class="shapes-info">
+                                    <span id="shapesCount">0 geometrie</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table id="shapesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Tipo</th>
+                                            <th>Posizione X (mm)</th>
+                                            <th>Posizione Y (mm)</th>
+                                            <th>Dimensioni</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="shapesTableBody">
+                                        <!-- Geometrie verranno inserite qui -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modal Impostazioni -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Impostazioni</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3>Griglia Cartesiana</h3>
+                        <div class="setting-row">
+                            <label for="minX">Minimo X (mm):</label>
+                            <input type="number" id="minX" value="-100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label for="maxX">Massimo X (mm):</label>
+                            <input type="number" id="maxX" value="100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label for="minY">Minimo Y (mm):</label>
+                            <input type="number" id="minY" value="-100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label for="maxY">Massimo Y (mm):</label>
+                            <input type="number" id="maxY" value="100" step="10">
+                        </div>
+                        <div class="setting-row">
+                            <label for="gridSize">Dimensione griglia secondaria (mm):</label>
+                            <input type="number" id="gridSize" value="10" min="1" step="1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="snapSize">Snap alla griglia (mm):</label>
+                            <input type="number" id="snapSize" value="1" min="0.1" step="0.1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="enableSnap">Abilita snap:</label>
+                            <input type="checkbox" id="enableSnap" checked>
+                        </div>
+                        <div class="setting-row">
+                            <label for="pixelsPerMm">Pixel per mm (scala):</label>
+                            <input type="number" id="pixelsPerMm" value="1" min="0.1" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Etichette Assi</h3>
+                        <div class="setting-row">
+                            <label for="xAxisLabel">Etichetta asse orizzontale:</label>
+                            <select id="xAxisLabel">
+                                <option value="X">X</option>
+                                <option value="Y">Y</option>
+                                <option value="Z">Z</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label for="yAxisLabel">Etichetta asse verticale:</label>
+                            <select id="yAxisLabel">
+                                <option value="X">X</option>
+                                <option value="Y" selected>Y</option>
+                                <option value="Z">Z</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Spline</h3>
+                        <div class="setting-row">
+                            <label for="samplingDistance">Distanza campionamento (mm):</label>
+                            <input type="number" id="samplingDistance" value="2" min="0.1" step="0.1">
+                        </div>
+                        <div class="setting-row">
+                            <label for="splineSmoothing">Fattore di smoothing:</label>
+                            <input type="range" id="splineSmoothing" min="0" max="1" step="0.1" value="0.5">
+                            <span id="smoothingValue">0.5</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Esportazione</h3>
+                        <div class="setting-row">
+                            <label for="basename">Nome base programma:</label>
+                            <input type="text" id="basename" value="program" maxlength="20">
+                        </div>
+                        <div class="setting-row">
+                            <label for="maxProgramNum">Numero massimo programma:</label>
+                            <input type="number" id="maxProgramNum" value="999" min="1" max="9999" step="1">
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Colori</h3>
+                        <div class="setting-row">
+                            <label for="splineColor">Colore spline:</label>
+                            <input type="color" id="splineColor" value="#ff0000">
+                        </div>
+                        <div class="setting-row">
+                            <label for="shapeColor">Colore forme:</label>
+                            <input type="color" id="shapeColor" value="#0066cc">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettings" class="btn btn-primary">Salva</button>
+                    <button id="resetSettings" class="btn btn-secondary">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="script.js?v=3.9"></script>
+</body>
+</html>
