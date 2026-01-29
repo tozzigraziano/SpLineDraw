@@ -69,6 +69,16 @@ class SpLineDrawPro {
             kukaOutputEnabled: false,
             kukaOutputId: 1,
             
+            // FANUC specific
+            fanucConfig: 'N U T, 0, 0, 0',
+            fanucW: -180,
+            fanucP: 0,
+            fanucR: 0,
+            fanucUF: 0,
+            fanucUT: 1,
+            fanucOutputEnabled: false,
+            fanucOutputId: 1,
+            
             // Colors
             pathColor: '#666666',
             processedColor: '#00ff88',
@@ -219,11 +229,21 @@ class SpLineDrawPro {
             kukaTool: document.getElementById('kukaTool'),
             kukaBase: document.getElementById('kukaBase'),
             kukaOutputEnabled: document.getElementById('kukaOutputEnabled'),
-            kukaOutputId: document.getElementById('kukaOutputId')
+            kukaOutputId: document.getElementById('kukaOutputId'),
+            // FANUC specific
+            fanucConfig: document.getElementById('fanucConfig'),
+            fanucW: document.getElementById('fanucW'),
+            fanucP: document.getElementById('fanucP'),
+            fanucR: document.getElementById('fanucR'),
+            fanucUF: document.getElementById('fanucUF'),
+            fanucUT: document.getElementById('fanucUT'),
+            fanucOutputEnabled: document.getElementById('fanucOutputEnabled'),
+            fanucOutputId: document.getElementById('fanucOutputId')
         };
         
         // Robot-specific parameter containers
         this.kukaParams = document.getElementById('kukaParams');
+        this.fanucParams = document.getElementById('fanucParams');
     }
 
     initializeCanvases() {
@@ -596,20 +616,83 @@ class SpLineDrawPro {
                 // Process the raw path
                 const processedPath = this.processPath(this.currentRawPath);
                 
-                // Create new path object
-                const newPath = {
-                    id: Date.now(),
-                    name: `Percorso ${this.paths.length + 1}`,
-                    rawPoints: [...this.currentRawPath],
-                    processedPoints: processedPath,
-                    color: this.layerColors[this.paths.length % this.layerColors.length],
-                    visible: true,
-                    locked: false,
-                    velocity: this.settings.defaultPathSpeed
-                };
+                // Check for points outside grid boundaries
+                const outsidePoints = processedPath.filter(p => 
+                    p.x < this.settings.minAxis1 || p.x > this.settings.maxAxis1 ||
+                    p.y < this.settings.minAxis2 || p.y > this.settings.maxAxis2
+                );
                 
-                this.paths.push(newPath);
-                this.activePathIndex = this.paths.length - 1;
+                const insidePoints = processedPath.filter(p => 
+                    p.x >= this.settings.minAxis1 && p.x <= this.settings.maxAxis1 &&
+                    p.y >= this.settings.minAxis2 && p.y <= this.settings.maxAxis2
+                );
+                
+                if (outsidePoints.length > 0) {
+                    // Show confirmation dialog
+                    const totalPoints = processedPath.length;
+                    const outsideCount = outsidePoints.length;
+                    const insideCount = insidePoints.length;
+                    
+                    if (insideCount === 0) {
+                        // All points are outside - cannot add path
+                        alert(`⚠️ Tutti i ${totalPoints} punti sono fuori dalla griglia.\n\nIl percorso non può essere aggiunto.`);
+                        this.previewCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                        this.currentRawPath = [];
+                        return;
+                    }
+                    
+                    const confirmed = confirm(
+                        `⚠️ ${outsideCount} punti su ${totalPoints} sono fuori dalla griglia.\n\n` +
+                        `• Punti dentro: ${insideCount}\n` +
+                        `• Punti fuori: ${outsideCount}\n\n` +
+                        `Vuoi confermare l'inserimento?\n` +
+                        `(I punti fuori verranno rimossi)`
+                    );
+                    
+                    if (!confirmed) {
+                        // User cancelled - don't add path
+                        this.previewCtx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                        this.currentRawPath = [];
+                        return;
+                    }
+                    
+                    // User confirmed - use only inside points
+                    // Filter raw points too (approximate matching)
+                    const filteredRawPath = this.currentRawPath.filter(p =>
+                        p.x >= this.settings.minAxis1 && p.x <= this.settings.maxAxis1 &&
+                        p.y >= this.settings.minAxis2 && p.y <= this.settings.maxAxis2
+                    );
+                    
+                    // Create new path object with filtered points
+                    const newPath = {
+                        id: Date.now(),
+                        name: `Percorso ${this.paths.length + 1}`,
+                        rawPoints: filteredRawPath.length >= 2 ? filteredRawPath : [...this.currentRawPath],
+                        processedPoints: insidePoints,
+                        color: this.layerColors[this.paths.length % this.layerColors.length],
+                        visible: true,
+                        locked: false,
+                        velocity: this.settings.defaultPathSpeed
+                    };
+                    
+                    this.paths.push(newPath);
+                    this.activePathIndex = this.paths.length - 1;
+                } else {
+                    // All points inside - add normally
+                    const newPath = {
+                        id: Date.now(),
+                        name: `Percorso ${this.paths.length + 1}`,
+                        rawPoints: [...this.currentRawPath],
+                        processedPoints: processedPath,
+                        color: this.layerColors[this.paths.length % this.layerColors.length],
+                        visible: true,
+                        locked: false,
+                        velocity: this.settings.defaultPathSpeed
+                    };
+                    
+                    this.paths.push(newPath);
+                    this.activePathIndex = this.paths.length - 1;
+                }
                 
                 this.updateLayersList();
                 this.updatePointsTable();
@@ -2172,11 +2255,11 @@ class SpLineDrawPro {
         
         // Hide all robot params first
         if (this.kukaParams) {
-            this.kukaParams.classList.toggle('hidden', robotType !== 'kuka');
+            this.kukaParams.style.display = robotType === 'kuka' ? 'block' : 'none';
         }
-        
-        // Add more robot types here as needed
-        // if (this.fanucParams) { ... }
+        if (this.fanucParams) {
+            this.fanucParams.style.display = robotType === 'fanuc' ? 'block' : 'none';
+        }
     }
 
     saveSettings() {
@@ -2992,8 +3075,14 @@ class SpLineDrawPro {
                 }
             }
             
-            // Add path points
+            // Add path points (only those inside the grid area)
             path.processedPoints.forEach((point, idx) => {
+                // Skip points outside the grid boundaries
+                if (point.x < this.settings.minAxis1 || point.x > this.settings.maxAxis1 ||
+                    point.y < this.settings.minAxis2 || point.y > this.settings.maxAxis2) {
+                    return; // Skip this point
+                }
+                
                 allPoints.push({
                     type: 'path',
                     x: point.x,
@@ -3046,7 +3135,14 @@ class SpLineDrawPro {
         const blob = new Blob([code], { type: 'text/plain' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `${programName}.src`;
+        
+        // Set file extension based on robot type
+        let extension = '.src'; // default KUKA
+        if (robotType === 'fanuc') extension = '.ls';
+        else if (robotType === 'abb') extension = '.mod';
+        else if (robotType === 'yaskawa') extension = '.jbi';
+        
+        link.download = `${programName}${extension}`;
         link.click();
         URL.revokeObjectURL(link.href);
     }
@@ -3320,7 +3416,238 @@ class SpLineDrawPro {
     }
 
     generateFanucCode(name, points) {
-        return `; FANUC export - Coming soon\n; ${name}`;
+        // Get FANUC parameters
+        const config = this.settings.fanucConfig || 'N U T, 0, 0, 0';
+        const W = this.settings.fanucW || -180;
+        const P = this.settings.fanucP || 0;
+        const R = this.settings.fanucR || 0;
+        const UF = this.settings.fanucUF || 0;
+        const UT = this.settings.fanucUT || 1;
+        const outputEnabled = this.settings.fanucOutputEnabled || false;
+        const outputId = this.settings.fanucOutputId || 1;
+        
+        // Helper function to check if two points are at same position
+        const samePosition = (p1, p2) => {
+            if (!p1 || !p2) return false;
+            const tolerance = 0.001; // 1 micron tolerance
+            return Math.abs(p1.x - p2.x) < tolerance &&
+                   Math.abs(p1.y - p2.y) < tolerance &&
+                   Math.abs((p1.z || 0) - (p2.z || 0)) < tolerance;
+        };
+        
+        // Filter out duplicate consecutive points and mark points that need FINE
+        // (if next point was duplicate, this point needs FINE to stop precisely)
+        const filteredPoints = [];
+        points.forEach((point, idx) => {
+            if (idx === 0) {
+                filteredPoints.push({ ...point, needsFine: false });
+            } else {
+                const prevPoint = filteredPoints[filteredPoints.length - 1];
+                if (samePosition(prevPoint, point)) {
+                    // Duplicate found - mark previous point as needing FINE
+                    prevPoint.needsFine = true;
+                } else {
+                    filteredPoints.push({ ...point, needsFine: false });
+                }
+            }
+        });
+        
+        // Separate points by type and path
+        const pathGroups = [];
+        let currentGroup = null;
+        let currentPathIndex = -1;
+        let approachPoint = null;
+        let exitPoint = null;
+        
+        filteredPoints.forEach(point => {
+            if (point.type === 'approach') {
+                approachPoint = point;
+            } else if (point.type === 'exit') {
+                exitPoint = point;
+            } else if (point.type === 'path') {
+                if (point.pathIndex !== currentPathIndex) {
+                    currentGroup = { type: 'path', pathIndex: point.pathIndex, points: [] };
+                    pathGroups.push(currentGroup);
+                    currentPathIndex = point.pathIndex;
+                }
+                currentGroup.points.push(point);
+            } else if (point.type === 'transition') {
+                if (!currentGroup || currentGroup.type !== 'transition' || currentGroup.transitionIndex !== point.transitionIndex) {
+                    currentGroup = { type: 'transition', transitionIndex: point.transitionIndex, points: [] };
+                    pathGroups.push(currentGroup);
+                }
+                currentGroup.points.push(point);
+            }
+        });
+        
+        // Build motion lines (/MN section)
+        let motionLines = [];
+        let positionData = [];
+        let pointIndex = 1;
+        let lineNum = 1;
+        let pathNum = 0;
+        
+        // Approach point - Joint move (J) with % speed
+        if (approachPoint) {
+            const termination = approachPoint.needsFine ? 'FINE' : 'CNT100';
+            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 100% ${termination}    ;`);
+            positionData.push({
+                idx: pointIndex,
+                x: approachPoint.x,
+                y: approachPoint.y,
+                z: approachPoint.z
+            });
+            pointIndex++;
+            lineNum++;
+        }
+        
+        // Process path groups
+        pathGroups.forEach((group, groupIdx) => {
+            if (group.type === 'path') {
+                pathNum++;
+                
+                // Add comment for path start
+                motionLines.push(`   ${lineNum}:  --eg:Path ${pathNum} Start ;`);
+                lineNum++;
+                
+                const lastPathIdx = group.points.length - 1;
+                
+                group.points.forEach((point, pIdx) => {
+                    const vel = Math.round(point.velocity || this.settings.defaultPathSpeed);
+                    const isLastPoint = (pIdx === lastPathIdx);
+                    
+                    if (pIdx === 0) {
+                        // First point of path: Linear move (L) with FINE to position at start
+                        motionLines.push(`   ${lineNum}:L P[${pointIndex}] ${vel}mm/sec FINE    ;`);
+                        
+                        // Output ON after reaching first point (before starting spline)
+                        if (outputEnabled) {
+                            lineNum++;
+                            motionLines.push(`   ${lineNum}:  DO[${outputId}]=ON ;`);
+                        }
+                        
+                        positionData.push({
+                            idx: pointIndex,
+                            x: point.x,
+                            y: point.y,
+                            z: point.z || 0
+                        });
+                        pointIndex++;
+                        lineNum++;
+                    } else {
+                        // Subsequent points: Spline move (S)
+                        // Use FINE for last point or if duplicate was removed, otherwise CNT100
+                        const termination = (isLastPoint || point.needsFine) ? 'FINE' : 'CNT100';
+                        motionLines.push(`   ${lineNum}:S P[${pointIndex}] ${vel}mm/sec ${termination}    ;`);
+                        
+                        positionData.push({
+                            idx: pointIndex,
+                            x: point.x,
+                            y: point.y,
+                            z: point.z || 0
+                        });
+                        pointIndex++;
+                        lineNum++;
+                    }
+                });
+                
+                // Output OFF after path complete
+                if (outputEnabled) {
+                    motionLines.push(`   ${lineNum}:  DO[${outputId}]=OFF ;`);
+                    lineNum++;
+                }
+                
+                // Add comment for path end
+                motionLines.push(`   ${lineNum}:  --eg:Path ${pathNum} End ;`);
+                lineNum++;
+                
+            } else if (group.type === 'transition') {
+                // Transition points - Linear moves (use FINE if point had duplicate removed after it)
+                group.points.forEach((point, pIdx) => {
+                    const vel = Math.round(point.velocity || this.settings.defaultTransitionSpeed);
+                    const termination = point.needsFine ? 'FINE' : 'CNT100';
+                    motionLines.push(`   ${lineNum}:L P[${pointIndex}] ${vel}mm/sec ${termination}    ;`);
+                    positionData.push({
+                        idx: pointIndex,
+                        x: point.x,
+                        y: point.y,
+                        z: point.z || 0
+                    });
+                    pointIndex++;
+                    lineNum++;
+                });
+            }
+        });
+        
+        // Exit point - Joint move (J) for fast return
+        if (exitPoint) {
+            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 100% CNT100    ;`);
+            positionData.push({
+                idx: pointIndex,
+                x: exitPoint.x,
+                y: exitPoint.y,
+                z: exitPoint.z
+            });
+            pointIndex++;
+            lineNum++;
+        }
+        
+        // Build the complete LS file
+        const now = new Date();
+        const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '-');
+        const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, ':');
+        
+        let code = `/PROG  ${name.toUpperCase()}
+/ATTR
+OWNER		= MNEDITOR;
+COMMENT		= "SpLine Draw Pro";
+PROG_SIZE	= 0;
+CREATE		= DATE ${dateStr}  TIME ${timeStr};
+MODIFIED	= DATE ${dateStr}  TIME ${timeStr};
+FILE_NAME	= ;
+VERSION		= 0;
+LINE_COUNT	= ${motionLines.length};
+MEMORY_SIZE	= 0;
+PROTECT		= READ_WRITE;
+TCD:  STACK_SIZE	= 0,
+      TASK_PRIORITY	= 50,
+      TIME_SLICE	= 0,
+      BUSY_LAMP_OFF	= 0,
+      ABORT_REQUEST	= 0,
+      PAUSE_REQUEST	= 0;
+DEFAULT_GROUP	= 1,*,*,*,*;
+CONTROL_CODE	= 00000000 00000000;
+LOCAL_REGISTERS	= 0,0,0;
+/MN
+`;
+        
+        // Add motion lines
+        code += motionLines.join('\n') + '\n';
+        
+        // Add position data
+        code += '/POS\n';
+        
+        positionData.forEach(pos => {
+            // Format numbers with proper spacing (like FANUC style)
+            const xStr = pos.x.toFixed(3).padStart(10);
+            const yStr = pos.y.toFixed(3).padStart(10);
+            const zStr = pos.z.toFixed(3).padStart(10);
+            const wStr = W.toFixed(3).padStart(10);
+            const pStr = P.toFixed(3).padStart(10);
+            const rStr = R.toFixed(3).padStart(10);
+            
+            code += `P[${pos.idx}]{
+   GP1:
+	UF : ${UF}, UT : ${UT},		CONFIG : '${config}',
+	X =${xStr}  mm,	Y =${yStr}  mm,	Z =${zStr}  mm,
+	W =${wStr} deg,	P =${pStr} deg,	R =${rStr} deg
+};
+`;
+        });
+        
+        code += '/END\n';
+        
+        return code;
     }
 
     generateAbbCode(name, points) {
