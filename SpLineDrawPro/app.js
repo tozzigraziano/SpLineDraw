@@ -50,7 +50,7 @@ class SpLineDrawPro {
             curvatureThreshold: 0.1,
             
             // Speeds
-            defaultPathSpeed: 30,
+            defaultPathSpeed: 50,
             defaultTransitionSpeed: 100,
             
             // Export
@@ -3113,6 +3113,20 @@ class SpLineDrawPro {
             return;
         }
         
+        // Warning for excessive points (FANUC controller memory/processing limits)
+        if (allPoints.length > 500) {
+            const proceed = confirm(
+                `⚠️ Attenzione: il programma contiene ${allPoints.length} punti.\n\n` +
+                `Programmi con più di 500 punti possono causare:\n` +
+                `- Rallentamenti del controller (MOTN-632 SPL:Speed Reduced)\n` +
+                `- Errori di pianificazione (MOTN-633 SPL:VAJ Limit)\n` +
+                `- Problemi di memoria sul controller\n\n` +
+                `Suggerimenti: aumenta Min Point Distance o Max Point Distance nelle impostazioni.\n\n` +
+                `Vuoi continuare comunque?`
+            );
+            if (!proceed) return;
+        }
+        
         let code = '';
         const programName = `${this.settings.basename}${this.currentProgramIndex}`;
         
@@ -3427,9 +3441,10 @@ class SpLineDrawPro {
         const outputId = this.settings.fanucOutputId || 1;
         
         // Helper function to check if two points are at same position
+        // FANUC SPLINE: "MOTN-635 SPL: Zero move" if two consecutive points are at same position
         const samePosition = (p1, p2) => {
             if (!p1 || !p2) return false;
-            const tolerance = 0.001; // 1 micron tolerance
+            const tolerance = 0.5; // 0.5mm tolerance to avoid MOTN-635 SPL: Zero move
             return Math.abs(p1.x - p2.x) < tolerance &&
                    Math.abs(p1.y - p2.y) < tolerance &&
                    Math.abs((p1.z || 0) - (p2.z || 0)) < tolerance;
@@ -3501,54 +3516,135 @@ class SpLineDrawPro {
             lineNum++;
         }
         
+        // Helper: calculate angle between 3 points (returns degrees 0-180)
+        // 180 = straight line, 0 = full reversal
+        const angleBetween = (p1, p2, p3) => {
+            const v1x = p1.x - p2.x, v1y = p1.y - p2.y;
+            const v2x = p3.x - p2.x, v2y = p3.y - p2.y;
+            const len1 = Math.hypot(v1x, v1y);
+            const len2 = Math.hypot(v2x, v2y);
+            if (len1 < 0.01 || len2 < 0.01) return 180; // degenerate, treat as straight
+            const dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
+            return Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI;
+        };
+
+        // FANUC SPLINE: split path into sub-segments at sharp corners
+        // Sharp corners (angle < 60°) cause "SPL: Invalid Set of Points" errors
+        // because the controller can't plan a smooth spline through cusps.
+        const splitPathAtSharpCorners = (points, minAngle = 60) => {
+            if (points.length < 4) return [points]; // too few points, single segment
+            
+            // Find split indices (sharp corner points)
+            const splitIndices = [];
+            for (let i = 1; i < points.length - 1; i++) {
+                const angle = angleBetween(points[i - 1], points[i], points[i + 1]);
+                if (angle < minAngle) {
+                    splitIndices.push(i);
+                }
+            }
+            
+            if (splitIndices.length === 0) return [points]; // no sharp corners
+            
+            // Split into sub-segments
+            const segments = [];
+            let start = 0;
+            for (const splitIdx of splitIndices) {
+                // Include the split point in both segments (end of current, start of next)
+                if (splitIdx > start) {
+                    segments.push(points.slice(start, splitIdx + 1));
+                }
+                start = splitIdx; // next segment starts at split point
+            }
+            // Add remaining points
+            if (start < points.length) {
+                segments.push(points.slice(start));
+            }
+            
+            return segments;
+        };
+
         // Process path groups
         pathGroups.forEach((group, groupIdx) => {
             if (group.type === 'path') {
                 pathNum++;
                 
+                // Split path at sharp corners to avoid "SPL: Invalid Set of Points"
+                const subSegments = splitPathAtSharpCorners(group.points);
+                const hasMultipleSegments = subSegments.length > 1;
+                
+                if (hasMultipleSegments) {
+                    console.log(`ℹ️ Path ${pathNum}: split into ${subSegments.length} sub-segments at sharp corners for FANUC SPLINE compatibility.`);
+                }
+                
                 // Add comment for path start
                 motionLines.push(`   ${lineNum}:  --eg:Path ${pathNum} Start ;`);
                 lineNum++;
                 
-                const lastPathIdx = group.points.length - 1;
-                
-                group.points.forEach((point, pIdx) => {
-                    const vel = Math.round(point.velocity || this.settings.defaultPathSpeed);
-                    const isLastPoint = (pIdx === lastPathIdx);
+                subSegments.forEach((segment, segIdx) => {
+                    const isFirstSegment = (segIdx === 0);
+                    const isLastSegment = (segIdx === subSegments.length - 1);
                     
-                    if (pIdx === 0) {
-                        // First point of path: Linear move (L) with FINE to position at start
-                        motionLines.push(`   ${lineNum}:L P[${pointIndex}] ${vel}mm/sec FINE    ;`);
-                        
-                        // Output ON after reaching first point (before starting spline)
-                        if (outputEnabled) {
-                            lineNum++;
-                            motionLines.push(`   ${lineNum}:  DO[${outputId}]=ON ;`);
-                        }
-                        
-                        positionData.push({
-                            idx: pointIndex,
-                            x: point.x,
-                            y: point.y,
-                            z: point.z || 0
-                        });
-                        pointIndex++;
-                        lineNum++;
-                    } else {
-                        // Subsequent points: Spline move (S)
-                        // Use FINE for last point or if duplicate was removed, otherwise CNT100
-                        const termination = (isLastPoint || point.needsFine) ? 'FINE' : 'CNT100';
-                        motionLines.push(`   ${lineNum}:S P[${pointIndex}] ${vel}mm/sec ${termination}    ;`);
-                        
-                        positionData.push({
-                            idx: pointIndex,
-                            x: point.x,
-                            y: point.y,
-                            z: point.z || 0
-                        });
-                        pointIndex++;
-                        lineNum++;
+                    // FANUC SPLINE requires minimum 3 consecutive S instructions (INTP-737)
+                    // A segment needs at least 4 points: 1st as L + 3 as S
+                    const useSpline = segment.length >= 4;
+                    
+                    if (!useSpline && segment.length > 1) {
+                        console.warn(`⚠️ Path ${pathNum} seg ${segIdx + 1}: only ${segment.length} points, using linear (L) movements.`);
                     }
+                    
+                    const lastSegIdx = segment.length - 1;
+                    
+                    segment.forEach((point, pIdx) => {
+                        const vel = Math.round(point.velocity || this.settings.defaultPathSpeed);
+                        const isLastPointInSegment = (pIdx === lastSegIdx);
+                        const isLastPointInPath = isLastSegment && isLastPointInSegment;
+                        
+                        if (pIdx === 0) {
+                            // First point of segment: Linear move (L) with FINE
+                            motionLines.push(`   ${lineNum}:L P[${pointIndex}] ${vel}mm/sec FINE    ;`);
+                            
+                            // Output ON only after first point of first segment
+                            if (isFirstSegment && outputEnabled) {
+                                lineNum++;
+                                motionLines.push(`   ${lineNum}:  DO[${outputId}]=ON ;`);
+                            }
+                            
+                            positionData.push({
+                                idx: pointIndex,
+                                x: point.x,
+                                y: point.y,
+                                z: point.z || 0
+                            });
+                            pointIndex++;
+                            lineNum++;
+                        } else if (useSpline) {
+                            // Spline move (S) - FINE only on last point of segment
+                            const termination = isLastPointInSegment ? 'FINE' : 'CNT100';
+                            motionLines.push(`   ${lineNum}:S P[${pointIndex}] ${vel}mm/sec ${termination}    ;`);
+                            
+                            positionData.push({
+                                idx: pointIndex,
+                                x: point.x,
+                                y: point.y,
+                                z: point.z || 0
+                            });
+                            pointIndex++;
+                            lineNum++;
+                        } else {
+                            // Fallback: Linear move (L)
+                            const termination = isLastPointInSegment ? 'FINE' : 'CNT100';
+                            motionLines.push(`   ${lineNum}:L P[${pointIndex}] ${vel}mm/sec ${termination}    ;`);
+                            
+                            positionData.push({
+                                idx: pointIndex,
+                                x: point.x,
+                                y: point.y,
+                                z: point.z || 0
+                            });
+                            pointIndex++;
+                            lineNum++;
+                        }
+                    });
                 });
                 
                 // Output OFF after path complete
