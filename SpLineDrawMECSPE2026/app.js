@@ -81,7 +81,8 @@ class SpLineDrawMECSPE {
             
             // Interface
             showSidePanel: true,
-            playbackBar: 'visible'
+            playbackBar: 'visible',
+            cleanView: false
         };
         
         this.settings = saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
@@ -229,7 +230,8 @@ class SpLineDrawMECSPE {
             postUploadCommand: document.getElementById('postUploadCommand'),
             // Interface
             showSidePanel: document.getElementById('showSidePanel'),
-            playbackBar: document.getElementById('playbackBar')
+            playbackBar: document.getElementById('playbackBar'),
+            cleanView: document.getElementById('cleanView')
         };
     }
 
@@ -306,6 +308,21 @@ class SpLineDrawMECSPE {
         const clearPathsBtn = document.getElementById('clearPathsBtn');
         if (clearPathsBtn) {
             clearPathsBtn.addEventListener('click', () => this.clearAllPaths());
+        }
+        
+        // Clean view toggle button
+        const cleanViewBtn = document.getElementById('cleanViewBtn');
+        if (cleanViewBtn) {
+            cleanViewBtn.addEventListener('click', () => {
+                this.settings.cleanView = !this.settings.cleanView;
+                localStorage.setItem('splineDrawMECSPE2026Settings', JSON.stringify(this.settings));
+                cleanViewBtn.querySelector('.material-symbols-outlined').textContent = 
+                    this.settings.cleanView ? 'visibility_off' : 'visibility';
+                this.redrawPaths();
+            });
+            // Set initial icon state
+            cleanViewBtn.querySelector('.material-symbols-outlined').textContent = 
+                this.settings.cleanView ? 'visibility_off' : 'visibility';
         }
         
         // Canvas events - Mouse
@@ -979,8 +996,10 @@ class SpLineDrawMECSPE {
         this.paths.forEach((path, index) => {
             if (!path.visible) return;
             
+            const isClean = this.settings.cleanView;
+            
             // Draw raw path (dimmed) - as simple lines
-            if (path.rawPoints && path.rawPoints.length >= 2) {
+            if (!isClean && path.rawPoints && path.rawPoints.length >= 2) {
                 ctx.strokeStyle = this.hexToRgba(path.color, 0.3);
                 ctx.lineWidth = 1;
                 ctx.setLineDash([3, 3]);
@@ -1007,7 +1026,8 @@ class SpLineDrawMECSPE {
                 // Draw spline curve
                 this.drawSplineCurve(ctx, path.processedPoints);
                 
-                // Draw control points
+                // Draw control points (skip in clean view)
+                if (!isClean) {
                 path.processedPoints.forEach((point, pIndex) => {
                     const screen = this.worldToScreen(point.x, point.y);
                     
@@ -1034,11 +1054,14 @@ class SpLineDrawMECSPE {
                         ctx.stroke();
                     }
                 });
+                }
             }
         });
         
-        // Draw transitions between paths
-        this.drawTransitions(ctx);
+        // Draw transitions between paths (skip in clean view)
+        if (!this.settings.cleanView) {
+            this.drawTransitions(ctx);
+        }
     }
 
     // Draw transition paths between consecutive paths
