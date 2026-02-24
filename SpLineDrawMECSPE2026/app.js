@@ -310,6 +310,12 @@ class SpLineDrawMECSPE {
             clearPathsBtn.addEventListener('click', () => this.clearAllPaths());
         }
         
+        // Undo last path button
+        const undoPathBtn = document.getElementById('undoPathBtn');
+        if (undoPathBtn) {
+            undoPathBtn.addEventListener('click', () => this.undoLastPath());
+        }
+        
         // Clean view toggle button
         const cleanViewBtn = document.getElementById('cleanViewBtn');
         if (cleanViewBtn) {
@@ -1384,11 +1390,24 @@ class SpLineDrawMECSPE {
         if (this.paths.length === 0) return;
         if (confirm('Eliminare tutti i percorsi?')) {
             this.paths = [];
+            this.transitions = [];
             this.activePathIndex = -1;
             this.updateLayersList();
             this.updatePointsTable();
+            this.updateTransitionsList();
             this.redrawPaths();
         }
+    }
+
+    undoLastPath() {
+        if (this.paths.length === 0) return;
+        this.paths.pop();
+        this.transitions = [];
+        this.activePathIndex = this.paths.length - 1;
+        this.updateLayersList();
+        this.updatePointsTable();
+        this.updateTransitionsList();
+        this.redrawPaths();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

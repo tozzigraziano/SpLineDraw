@@ -134,8 +134,22 @@ header h1 {
     display: flex;
     align-items: center;
     padding: 6px 12px;
-    gap: 16px;
+    gap: 8px;
     overflow-x: auto;
+}
+
+.toolbar-btn {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.toolbar-btn .material-symbols-outlined {
+    font-size: 22px;
 }
 
 .toolbar-section {
@@ -258,11 +272,12 @@ header h1 {
 
 /* Tool Buttons */
 .tool-btn {
-    padding: 8px 10px;
+    padding: 0 10px;
     background: transparent;
     border: none;
-    min-width: 44px; /* Touch-friendly minimum size */
-    min-height: 44px;
+    height: 36px;
+    min-height: 36px;
+    min-width: 36px;
 }
 
 .tool-btn:hover {
