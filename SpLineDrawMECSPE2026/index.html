@@ -324,8 +324,30 @@
                     <div class="settings-section">
                         <h3>Connessione FTP</h3>
                         <div class="setting-row">
-                            <label for="ftpPath">Percorso FTP:</label>
-                            <input type="text" id="ftpPath" value="ftp://192.168.1.1/" placeholder="ftp://192.168.1.1/percorso/" style="width: 240px;">
+                            <label for="ftpHost">Host:</label>
+                            <input type="text" id="ftpHost" value="192.168.1.1" placeholder="192.168.1.1" style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="ftpPort">Porta:</label>
+                            <input type="number" id="ftpPort" value="21" min="1" max="65535">
+                        </div>
+                        <div class="setting-row">
+                            <label for="ftpUser">Utente:</label>
+                            <input type="text" id="ftpUser" value="anonymous" placeholder="anonymous" style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="ftpPassword">Password:</label>
+                            <input type="password" id="ftpPassword" value="" placeholder="(vuoto)" style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="ftpRemotePath">Cartella remota:</label>
+                            <input type="text" id="ftpRemotePath" value="/md" placeholder="/md" style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <button id="ftpTestBtn" class="btn" style="width: 100%; margin-top: 4px;">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">wifi_tethering</span>
+                                Test Connessione
+                            </button>
                         </div>
                     </div>
                     

@@ -68,7 +68,11 @@ class SpLineDrawMECSPE {
             fanucOutputId: 1,
             
             // FTP
-            ftpPath: 'ftp://192.168.1.1/',
+            ftpHost: '192.168.1.1',
+            ftpPort: 21,
+            ftpUser: 'anonymous',
+            ftpPassword: '',
+            ftpRemotePath: '/md',
             
             // Colors
             pathColor: '#666666',
@@ -152,6 +156,7 @@ class SpLineDrawMECSPE {
         this.ftpStatusText = document.getElementById('ftpStatusText');
         this.ftpDetails = document.getElementById('ftpDetails');
         this.ftpCloseBtn = document.getElementById('ftpCloseBtn');
+        this.ftpTestBtn = document.getElementById('ftpTestBtn');
         
         // Tools (always path)
         this.toolButtons = document.querySelectorAll('.tool-btn');
@@ -215,7 +220,11 @@ class SpLineDrawMECSPE {
             fanucOutputEnabled: document.getElementById('fanucOutputEnabled'),
             fanucOutputId: document.getElementById('fanucOutputId'),
             // FTP
-            ftpPath: document.getElementById('ftpPath'),
+            ftpHost: document.getElementById('ftpHost'),
+            ftpPort: document.getElementById('ftpPort'),
+            ftpUser: document.getElementById('ftpUser'),
+            ftpPassword: document.getElementById('ftpPassword'),
+            ftpRemotePath: document.getElementById('ftpRemotePath'),
             // Interface
             showSidePanel: document.getElementById('showSidePanel'),
             playbackBar: document.getElementById('playbackBar')
@@ -266,6 +275,9 @@ class SpLineDrawMECSPE {
         this.ftpCloseBtn.addEventListener('click', () => {
             this.ftpModal.classList.remove('active');
         });
+        
+        // FTP Test connection
+        this.ftpTestBtn.addEventListener('click', () => this.testFtpConnection());
         
         // Playback
         this.playBtn.addEventListener('click', () => this.startAnimation());
@@ -2371,7 +2383,11 @@ class SpLineDrawMECSPE {
             return;
         }
         
-        const ftpPath = this.settings.ftpPath || 'ftp://192.168.1.1/';
+        const ftpHost = this.settings.ftpHost || '192.168.1.1';
+        const ftpPort = this.settings.ftpPort || 21;
+        const ftpUser = this.settings.ftpUser || 'anonymous';
+        const ftpPassword = this.settings.ftpPassword || '';
+        const ftpRemotePath = this.settings.ftpRemotePath || '/md';
         const fileName = 'SpLinePath.ls';
         
         // Show FTP modal
@@ -2379,55 +2395,98 @@ class SpLineDrawMECSPE {
         this.ftpStatusIcon.textContent = 'hourglass_empty';
         this.ftpStatusIcon.style.color = 'var(--warning)';
         this.ftpStatusText.textContent = 'Preparazione file...';
-        this.ftpDetails.innerHTML = `<p>File: <strong>${fileName}</strong></p><p>Destinazione: <strong>${ftpPath}</strong></p>`;
+        this.ftpDetails.innerHTML = `<p>File: <strong>${fileName}</strong></p><p>Destinazione: <strong>${ftpHost}:${ftpPort}${ftpRemotePath}</strong></p>`;
         
         try {
-            // Build FTP URL
-            let ftpUrl = ftpPath;
-            if (!ftpUrl.endsWith('/')) ftpUrl += '/';
-            ftpUrl += fileName;
-            
-            this.ftpStatusText.textContent = 'Invio in corso...';
+            this.ftpStatusText.textContent = 'Invio FTP in corso...';
             this.ftpStatusIcon.textContent = 'sync';
             
-            // Attempt FTP upload via PUT request
-            const blob = new Blob([code], { type: 'text/plain' });
-            
-            const response = await fetch(ftpUrl, {
-                method: 'PUT',
-                body: blob,
-                headers: {
-                    'Content-Type': 'text/plain'
-                }
+            const response = await fetch('/api/ftp-upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ftpHost,
+                    ftpPort,
+                    ftpUser,
+                    ftpPassword,
+                    ftpRemotePath,
+                    fileName,
+                    fileContent: code
+                })
             });
             
-            if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
                 this.ftpStatusIcon.textContent = 'check_circle';
                 this.ftpStatusIcon.style.color = 'var(--accent-primary)';
                 this.ftpStatusText.textContent = 'File inviato con successo!';
-                this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ Upload completato</p>`;
+                this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ ${result.message}</p>`;
             } else {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error(result.error || 'Errore sconosciuto');
             }
         } catch (error) {
             console.error('FTP Error:', error);
             
-            // Fallback: download the file locally
             this.ftpStatusIcon.textContent = 'error';
             this.ftpStatusIcon.style.color = 'var(--danger)';
             this.ftpStatusText.textContent = 'Errore invio FTP';
             this.ftpDetails.innerHTML += `
                 <p style="color: var(--danger); margin-top: 8px;">Errore: ${error.message}</p>
-                <p style="margin-top: 8px; color: var(--text-secondary);">Il file verrà scaricato localmente come fallback.</p>
+                <p style="margin-top: 8px; color: var(--text-secondary);">Il file verrà scaricato localmente.</p>
             `;
             
-            // Download locally as fallback
+            // Fallback: download locally
             const blob = new Blob([code], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = fileName;
             link.click();
             URL.revokeObjectURL(link.href);
+        }
+    }
+
+    async testFtpConnection() {
+        const ftpHost = this.settings.ftpHost || '192.168.1.1';
+        const ftpPort = this.settings.ftpPort || 21;
+        const ftpUser = this.settings.ftpUser || 'anonymous';
+        const ftpPassword = this.settings.ftpPassword || '';
+        const ftpRemotePath = this.settings.ftpRemotePath || '/md';
+        
+        const testBtn = document.getElementById('ftpTestBtn');
+        const originalHTML = testBtn.innerHTML;
+        testBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">sync</span> Connessione...';
+        testBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/ftp-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ftpHost, ftpPort, ftpUser, ftpPassword, ftpRemotePath })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                testBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">check_circle</span> Connesso!';
+                testBtn.style.color = 'var(--accent-primary)';
+                setTimeout(() => {
+                    testBtn.innerHTML = originalHTML;
+                    testBtn.style.color = '';
+                }, 3000);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            testBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">error</span> Errore';
+            testBtn.style.color = 'var(--danger)';
+            alert(`Test FTP fallito:\n${error.message}`);
+            setTimeout(() => {
+                testBtn.innerHTML = originalHTML;
+                testBtn.style.color = '';
+            }, 3000);
+        } finally {
+            testBtn.disabled = false;
         }
     }
 

@@ -1,0 +1,13 @@
+{
+  "name": "splinedraw-mecspe2026",
+  "version": "1.0.0",
+  "description": "SpLine Draw MECSPE 2026 - Server con proxy FTP per FANUC",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "install-and-start": "npm install && node server.js"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5"
+  }
+}
