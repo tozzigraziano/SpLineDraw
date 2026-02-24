@@ -339,6 +339,11 @@
                             <input type="text" id="ftpRemotePath" value="/md" placeholder="/md" style="width: 180px;">
                         </div>
                         <div class="setting-row">
+                            <label for="postUploadCommand">Comando post-upload:</label>
+                            <input type="text" id="postUploadCommand" value="" placeholder="http://192.168.1.1/KCL/..." style="width: 100%;">
+                            <small style="color: var(--text-secondary); font-size: 11px;">URL HTTP da chiamare dopo l'invio FTP (lasciare vuoto per disabilitare)</small>
+                        </div>
+                        <div class="setting-row">
                             <button id="ftpTestBtn" class="btn" style="width: 100%; margin-top: 4px;">
                                 <span class="material-symbols-outlined" style="font-size: 16px;">wifi_tethering</span>
                                 Test Connessione

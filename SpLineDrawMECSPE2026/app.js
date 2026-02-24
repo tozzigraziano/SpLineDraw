@@ -73,6 +73,7 @@ class SpLineDrawMECSPE {
             ftpUser: 'anonymous',
             ftpPassword: '',
             ftpRemotePath: 'md:',
+            postUploadCommand: '',
             
             // Colors
             pathColor: '#666666',
@@ -225,6 +226,7 @@ class SpLineDrawMECSPE {
             ftpUser: document.getElementById('ftpUser'),
             ftpPassword: document.getElementById('ftpPassword'),
             ftpRemotePath: document.getElementById('ftpRemotePath'),
+            postUploadCommand: document.getElementById('postUploadCommand'),
             // Interface
             showSidePanel: document.getElementById('showSidePanel'),
             playbackBar: document.getElementById('playbackBar')
@@ -2399,6 +2401,9 @@ class SpLineDrawMECSPE {
                 this.ftpStatusIcon.style.color = 'var(--accent-primary)';
                 this.ftpStatusText.textContent = 'File inviato con successo!';
                 this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ ${result.message}</p>`;
+                
+                // Send post-upload HTTP command if configured
+                await this.sendPostUploadCommand();
             } else {
                 throw new Error(result.error || 'Errore sconosciuto');
             }
@@ -2464,6 +2469,31 @@ class SpLineDrawMECSPE {
             }, 3000);
         } finally {
             testBtn.disabled = false;
+        }
+    }
+
+    async sendPostUploadCommand() {
+        const commandUrl = this.settings.postUploadCommand;
+        if (!commandUrl || commandUrl.trim() === '') return;
+        
+        try {
+            this.ftpDetails.innerHTML += `<p style="margin-top: 8px;">Invio comando: <strong>${commandUrl}</strong>...</p>`;
+            
+            const response = await fetch('/api/http-command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: commandUrl.trim() })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.ftpDetails.innerHTML += `<p class="text-accent">✓ Comando inviato</p>`;
+            } else {
+                this.ftpDetails.innerHTML += `<p style="color: var(--warning);">⚠ Comando fallito: ${result.error}</p>`;
+            }
+        } catch (error) {
+            this.ftpDetails.innerHTML += `<p style="color: var(--warning);">⚠ Comando fallito: ${error.message}</p>`;
         }
     }
 

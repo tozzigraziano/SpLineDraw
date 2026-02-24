@@ -155,6 +155,52 @@ async function handleApi(req, res) {
         return;
     }
 
+    // HTTP command proxy (fire-and-forget GET request)
+    if (req.method === 'POST' && req.url === '/api/http-command') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+                const targetUrl = data.url;
+                
+                if (!targetUrl) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'URL mancante' }));
+                    return;
+                }
+                
+                console.log(`[CMD] Invio comando: ${targetUrl}`);
+                
+                // Use http/https module based on URL
+                const httpModule = targetUrl.startsWith('https') ? require('https') : require('http');
+                
+                await new Promise((resolve, reject) => {
+                    const request = httpModule.get(targetUrl, { timeout: 10000 }, (response) => {
+                        // Consume response data to free up memory
+                        response.resume();
+                        response.on('end', resolve);
+                    });
+                    request.on('error', reject);
+                    request.on('timeout', () => {
+                        request.destroy();
+                        reject(new Error('Timeout'));
+                    });
+                });
+                
+                console.log(`[CMD] ✓ Comando inviato`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Comando inviato' }));
+                
+            } catch (err) {
+                console.error(`[CMD] ✗ Errore:`, err.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+        });
+        return;
+    }
+
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Endpoint non trovato' }));
 }
