@@ -21,6 +21,7 @@ class SpLineDrawPro {
             this.resizeCanvases();
             this.drawGrid();
             this.updateUI();
+            this.applyInterfaceSettings();
         }, 50);
     }
 
@@ -82,7 +83,12 @@ class SpLineDrawPro {
             // Colors
             pathColor: '#666666',
             processedColor: '#00ff88',
-            shapeColor: '#4a90d9'
+            shapeColor: '#4a90d9',
+            
+            // Interface
+            showSidePanel: true,
+            enableGeometries: true,
+            playbackBar: 'visible'   // 'visible' | 'hidden'
         };
         
         this.settings = saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
@@ -238,7 +244,11 @@ class SpLineDrawPro {
             fanucUF: document.getElementById('fanucUF'),
             fanucUT: document.getElementById('fanucUT'),
             fanucOutputEnabled: document.getElementById('fanucOutputEnabled'),
-            fanucOutputId: document.getElementById('fanucOutputId')
+            fanucOutputId: document.getElementById('fanucOutputId'),
+            // Interface
+            showSidePanel: document.getElementById('showSidePanel'),
+            enableGeometries: document.getElementById('enableGeometries'),
+            playbackBar: document.getElementById('playbackBar')
         };
         
         // Robot-specific parameter containers
@@ -928,7 +938,7 @@ class SpLineDrawPro {
             const lastPoint = result[result.length - 1];
             const distToLast = Math.hypot(curr.x - lastPoint.x, curr.y - lastPoint.y);
             
-            if (isCorner || distToLast >= minDist * 0.3) {
+            if (isCorner || distToLast >= minDist) {
                 result.push({ ...curr });
             }
         }
@@ -2307,6 +2317,9 @@ class SpLineDrawPro {
         this.drawGrid();
         this.redrawAll();
         
+        // Apply interface settings
+        this.applyInterfaceSettings();
+        
         this.settingsModal.classList.remove('active');
     }
 
@@ -2318,6 +2331,7 @@ class SpLineDrawPro {
             this.calculateScale();
             this.drawGrid();
             this.redrawAll();
+            this.applyInterfaceSettings();
         }
     }
 
@@ -2335,6 +2349,47 @@ class SpLineDrawPro {
         document.getElementById('maxAxis1Label').textContent = `Max ${axis1} (mm):`;
         document.getElementById('minAxis2Label').textContent = `Min ${axis2} (mm):`;
         document.getElementById('maxAxis2Label').textContent = `Max ${axis2} (mm):`;
+    }
+
+    applyInterfaceSettings() {
+        // Side panel visibility
+        const sidePanel = document.getElementById('sidePanel');
+        if (sidePanel) {
+            sidePanel.style.display = this.settings.showSidePanel ? '' : 'none';
+        }
+        
+        // Geometry tools visibility
+        const enableGeo = this.settings.enableGeometries;
+        const rectBtn = document.getElementById('rectBtn');
+        const circleBtn = document.getElementById('circleBtn');
+        const clearShapesBtn2 = document.getElementById('clearShapesBtn2');
+        const shapesTab = document.querySelector('.tab-btn[data-tab="shapes"]');
+        
+        if (rectBtn) rectBtn.style.display = enableGeo ? '' : 'none';
+        if (circleBtn) circleBtn.style.display = enableGeo ? '' : 'none';
+        if (clearShapesBtn2) clearShapesBtn2.style.display = enableGeo ? '' : 'none';
+        if (shapesTab) shapesTab.style.display = enableGeo ? '' : 'none';
+        
+        // If geometries disabled and current tool is a shape tool, switch to path
+        if (!enableGeo && (this.currentTool === 'rectangle' || this.currentTool === 'circle')) {
+            this.selectTool('path');
+        }
+        
+        // If geometries disabled and shapes tab is active, switch to layers tab
+        if (!enableGeo && shapesTab && shapesTab.classList.contains('active')) {
+            const layersTab = document.querySelector('.tab-btn[data-tab="layers"]');
+            if (layersTab) layersTab.click();
+        }
+        
+        // Playback bar visibility
+        const playbackSection = document.querySelector('.playback-group')?.closest('.toolbar-section');
+        if (playbackSection) {
+            playbackSection.style.display = this.settings.playbackBar === 'hidden' ? 'none' : '';
+        }
+        
+        // Recalculate canvas dimensions after layout change
+        // Use requestAnimationFrame to wait for the DOM to reflow
+        requestAnimationFrame(() => this.resizeCanvases());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
