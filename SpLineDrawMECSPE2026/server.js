@@ -44,7 +44,7 @@ const MIME_TYPES = {
  */
 async function uploadToFtp(ftpConfig, fileName, fileContent) {
     const client = new Client(60000);
-    client.ftp.verbose = true;
+    client.ftp.verbose = false;
     client.ftp.ipFamily = 4; // Force IPv4 (PASV instead of EPSV) - Fanuc compatibility
 
     try {
@@ -99,19 +99,12 @@ async function handleApi(req, res) {
                     port: parseInt(ftpPort) || 21,
                     user: ftpUser || 'anonymous',
                     password: ftpPassword || '',
-                    remotePath: ftpRemotePath || '/'
-                };
+                    remotePath: ftpRemotePath || '/'\n                };\n\n                const result = await uploadToFtp(ftpConfig, fileName, fileContent);
 
-                console.log(`[FTP] Upload ${fileName} -> ${ftpConfig.host}:${ftpConfig.port}${ftpConfig.remotePath}`);
-
-                const result = await uploadToFtp(ftpConfig, fileName, fileContent);
-
-                console.log(`[FTP] ✓ Upload completato: ${fileName}`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(result));
 
             } catch (err) {
-                console.error(`[FTP] ✗ Errore:`, err.message);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: err.message }));
             }
@@ -127,7 +120,7 @@ async function handleApi(req, res) {
             try {
                 const data = JSON.parse(body);
                 const client = new Client(60000);
-                client.ftp.verbose = true;
+                client.ftp.verbose = false;
                 client.ftp.ipFamily = 4; // Force IPv4 (PASV instead of EPSV) - Fanuc compatibility
 
                 await client.access({
@@ -148,12 +141,10 @@ async function handleApi(req, res) {
                 const list = await client.list();
                 client.close();
 
-                console.log(`[FTP] ✓ Test connessione OK: ${data.ftpHost} (${list.length} files)`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, message: `Connessione riuscita. ${list.length} file trovati.` }));
 
             } catch (err) {
-                console.error(`[FTP] ✗ Test fallito:`, err.message);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: err.message }));
             }
