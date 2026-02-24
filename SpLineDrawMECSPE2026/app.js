@@ -716,6 +716,7 @@ class SpLineDrawMECSPE {
     }
 
     updateCoordinates(point) {
+        if (!this.coordinatesDisplay) return;
         const axes = this.getAxisLabels();
         this.coordinatesDisplay.textContent = 
             `${axes.x}: ${point.x.toFixed(1)} | ${axes.y}: ${point.y.toFixed(1)}`;
