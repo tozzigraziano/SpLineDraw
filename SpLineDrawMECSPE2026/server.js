@@ -99,10 +99,7 @@ async function handleApi(req, res) {
                     port: parseInt(ftpPort) || 21,
                     user: ftpUser || 'anonymous',
                     password: ftpPassword || '',
-                    remotePath: ftpRemotePath || '/'
-                };
-
-                const result = await uploadToFtp(ftpConfig, fileName, fileContent);
+                    remotePath: ftpRemotePath || '/'\n                };\n\n                const result = await uploadToFtp(ftpConfig, fileName, fileContent);
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(result));
