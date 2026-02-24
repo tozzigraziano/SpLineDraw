@@ -72,7 +72,7 @@ class SpLineDrawMECSPE {
             ftpPort: 21,
             ftpUser: 'anonymous',
             ftpPassword: '',
-            ftpRemotePath: '/md',
+            ftpRemotePath: 'md:',
             
             // Colors
             pathColor: '#666666',
@@ -2387,7 +2387,7 @@ class SpLineDrawMECSPE {
         const ftpPort = this.settings.ftpPort || 21;
         const ftpUser = this.settings.ftpUser || 'anonymous';
         const ftpPassword = this.settings.ftpPassword || '';
-        const ftpRemotePath = this.settings.ftpRemotePath || '/md';
+        const ftpRemotePath = this.settings.ftpRemotePath || 'md:';
         const fileName = 'SpLinePath.ls';
         
         // Show FTP modal
@@ -2451,7 +2451,7 @@ class SpLineDrawMECSPE {
         const ftpPort = this.settings.ftpPort || 21;
         const ftpUser = this.settings.ftpUser || 'anonymous';
         const ftpPassword = this.settings.ftpPassword || '';
-        const ftpRemotePath = this.settings.ftpRemotePath || '/md';
+        const ftpRemotePath = this.settings.ftpRemotePath || 'md:';
         
         const testBtn = document.getElementById('ftpTestBtn');
         const originalHTML = testBtn.innerHTML;
