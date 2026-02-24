@@ -43,8 +43,9 @@ const MIME_TYPES = {
  * Upload a file to FTP server
  */
 async function uploadToFtp(ftpConfig, fileName, fileContent) {
-    const client = new Client();
-    client.ftp.verbose = false;
+    const client = new Client(60000);
+    client.ftp.verbose = true;
+    client.ftp.ipFamily = 4; // Force IPv4 (PASV instead of EPSV) - Fanuc compatibility
 
     try {
         await client.access({
@@ -54,6 +55,9 @@ async function uploadToFtp(ftpConfig, fileName, fileContent) {
             password: ftpConfig.password || '',
             secure: false
         });
+
+        // Use binary transfer mode
+        await client.send('TYPE I');
 
         // Navigate to remote directory if specified
         if (ftpConfig.remotePath && ftpConfig.remotePath !== '/' && ftpConfig.remotePath !== '') {
@@ -122,8 +126,9 @@ async function handleApi(req, res) {
         req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
-                const client = new Client();
-                client.ftp.verbose = false;
+                const client = new Client(60000);
+                client.ftp.verbose = true;
+                client.ftp.ipFamily = 4; // Force IPv4 (PASV instead of EPSV) - Fanuc compatibility
 
                 await client.access({
                     host: data.ftpHost,
@@ -132,6 +137,9 @@ async function handleApi(req, res) {
                     password: data.ftpPassword || '',
                     secure: false
                 });
+
+                // Use binary transfer mode
+                await client.send('TYPE I');
 
                 // Try to list files to confirm connection
                 if (data.ftpRemotePath && data.ftpRemotePath !== '/') {
