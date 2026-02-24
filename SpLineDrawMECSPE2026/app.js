@@ -1343,30 +1343,6 @@ class SpLineDrawMECSPE {
                 ctx.arc(screen.x, screen.y, 4, 0, Math.PI * 2);
                 ctx.fillStyle = '#00ffff';
                 ctx.fill();
-                
-                // Draw coordinates tooltip
-                ctx.font = 'bold 12px Consolas, monospace';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'bottom';
-                
-                const text = `(${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
-                const textWidth = ctx.measureText(text).width;
-                
-                // Background
-                const tooltipX = screen.x + 18;
-                const tooltipY = screen.y - 8;
-                
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.fillRect(tooltipX - 4, tooltipY - 14, textWidth + 8, 18);
-                
-                // Border
-                ctx.strokeStyle = '#00ffff';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(tooltipX - 4, tooltipY - 14, textWidth + 8, 18);
-                
-                // Text
-                ctx.fillStyle = '#00ffff';
-                ctx.fillText(text, tooltipX, tooltipY);
             }
         }
     }
