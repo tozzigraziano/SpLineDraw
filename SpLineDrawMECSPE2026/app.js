@@ -62,26 +62,26 @@ class SpLineDrawMECSPE {
             fanucW: -180,
             fanucP: 0,
             fanucR: 0,
-            fanucUF: 0,
+            fanucUF: 1,
             fanucUT: 1,
             fanucOutputEnabled: false,
             fanucOutputId: 1,
             
             // FTP
-            ftpHost: '192.168.1.1',
+            ftpHost: '192.168.102.195',
             ftpPort: 21,
             ftpUser: 'anonymous',
-            ftpPassword: '',
-            ftpRemotePath: 'md:',
-            postUploadCommand: '',
+            ftpPassword: 'anonymous',
+            ftpRemotePath: '/md:',
+            postUploadCommand: 'http://192.168.102.195/KCL/SET PORT DOUT[1] = ON',
             
             // Colors
             pathColor: '#666666',
             processedColor: '#00ff88',
             
             // Interface
-            showSidePanel: true,
-            playbackBar: 'visible',
+            showSidePanel: false,
+            playbackBar: 'hidden',
             cleanView: false
         };
         
