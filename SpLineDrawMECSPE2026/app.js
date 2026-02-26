@@ -68,12 +68,12 @@ class SpLineDrawMECSPE {
             fanucOutputId: 1,
             
             // FTP
-            ftpHost: '192.168.0.11',
+            ftpHost: '192.168.0.21',
             ftpPort: 21,
             ftpUser: 'anonymous',
             ftpPassword: 'anonymous',
             ftpRemotePath: '/md:',
-            postUploadCommand: 'http://192.168.0.11/KCL/SET PORT DOUT[1] = ON',
+            postUploadCommand: 'http://192.168.0.21/KCL/SET PORT DOUT[1] = ON',
             
             // Colors
             pathColor: '#666666',
