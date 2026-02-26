@@ -59,21 +59,21 @@ class SpLineDrawMECSPE {
             
             // FANUC specific
             fanucConfig: 'N U T, 0, 0, 0',
-            fanucW: -180,
+            fanucW: 180,
             fanucP: 0,
-            fanucR: 0,
-            fanucUF: 1,
-            fanucUT: 1,
+            fanucR: 45,
+            fanucUF: 3,
+            fanucUT: 2,
             fanucOutputEnabled: false,
             fanucOutputId: 1,
             
             // FTP
-            ftpHost: '192.168.102.195',
+            ftpHost: '192.168.0.11',
             ftpPort: 21,
             ftpUser: 'anonymous',
             ftpPassword: 'anonymous',
             ftpRemotePath: '/md:',
-            postUploadCommand: 'http://192.168.102.195/KCL/SET PORT DOUT[1] = ON',
+            postUploadCommand: 'http://192.168.0.11/KCL/SET PORT DOUT[1] = ON',
             
             // Colors
             pathColor: '#666666',
@@ -82,7 +82,7 @@ class SpLineDrawMECSPE {
             // Interface
             showSidePanel: false,
             playbackBar: 'hidden',
-            cleanView: false
+            cleanView: true
         };
         
         this.settings = saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
