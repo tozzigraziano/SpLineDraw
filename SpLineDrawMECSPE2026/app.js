@@ -37,7 +37,7 @@ class SpLineDrawMECSPE {
             
             // Grid
             minAxis1: 0,
-            maxAxis1: 100,
+            maxAxis1: 85,
             minAxis2: 0,
             maxAxis2: 100,
             gridSize: 10,
@@ -58,10 +58,10 @@ class SpLineDrawMECSPE {
             robotType: 'fanuc',
             
             // FANUC specific
-            fanucConfig: 'N U T, 0, 0, 0',
+            fanucConfig: 'F U T, 0, 0, 0',
             fanucW: 180,
             fanucP: 0,
-            fanucR: 45,
+            fanucR: 70,
             fanucUF: 3,
             fanucUT: 2,
             fanucOutputEnabled: false,
