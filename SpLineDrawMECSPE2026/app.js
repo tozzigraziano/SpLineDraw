@@ -61,7 +61,7 @@ class SpLineDrawMECSPE {
             fanucConfig: 'F U T, 0, 0, 0',
             fanucW: 180,
             fanucP: 0,
-            fanucR: 70,
+            fanucR: -100,
             fanucUF: 3,
             fanucUT: 2,
             fanucOutputEnabled: false,
