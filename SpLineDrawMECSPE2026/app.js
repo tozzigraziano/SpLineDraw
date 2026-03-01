@@ -45,8 +45,8 @@ class SpLineDrawMECSPE {
             enableSnap: true,
             
             // Path processing
-            smoothingFactor: 0.5,
-            minPointDistance: 2,
+            smoothingFactor: 0.3,
+            minPointDistance: 0.5,
             maxPointDistance: 10,
             curvatureThreshold: 0.1,
             
@@ -2637,7 +2637,7 @@ class SpLineDrawMECSPE {
         // Approach point - Joint move (J) with % speed
         if (approachPoint) {
             const termination = approachPoint.needsFine ? 'FINE' : 'CNT100';
-            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 100% ${termination}    ;`);
+            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 20% ${termination}    ;`);
             positionData.push({
                 idx: pointIndex,
                 x: approachPoint.x,
@@ -2809,7 +2809,7 @@ class SpLineDrawMECSPE {
         
         // Exit point - Joint move (J) for fast return
         if (exitPoint) {
-            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 100% CNT100    ;`);
+            motionLines.push(`   ${lineNum}:J P[${pointIndex}] 20% CNT100    ;`);
             positionData.push({
                 idx: pointIndex,
                 x: exitPoint.x,
