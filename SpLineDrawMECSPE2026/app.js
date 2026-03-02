@@ -74,6 +74,7 @@ class SpLineDrawMECSPE {
             ftpPassword: 'anonymous',
             ftpRemotePath: '/md:',
             postUploadCommand: 'http://192.168.0.21/KCL/SET PORT DOUT[1] = ON',
+            postcardCommand: 'http://192.168.0.21/KCL/SET PORT DOUT[2] = ON',
             
             // Colors
             pathColor: '#666666',
@@ -151,6 +152,7 @@ class SpLineDrawMECSPE {
         this.loadBtn = document.getElementById('loadBtn');
         this.fileInput = document.getElementById('fileInput');
         this.sendFtpBtn = document.getElementById('sendFtpBtn');
+        this.postcardBtn = document.getElementById('postcardBtn');
         
         // FTP Modal
         this.ftpModal = document.getElementById('ftpModal');
@@ -274,6 +276,9 @@ class SpLineDrawMECSPE {
         
         // FTP Send
         this.sendFtpBtn.addEventListener('click', () => this.sendFTP());
+        
+        // Postcard - send draw command to robot
+        this.postcardBtn.addEventListener('click', () => this.sendPostcardCommand());
         
         // FTP Modal close
         this.ftpCloseBtn.addEventListener('click', () => {
@@ -2536,6 +2541,46 @@ class SpLineDrawMECSPE {
             }
         } catch (error) {
             this.ftpDetails.innerHTML += `<p style="color: var(--warning);">⚠ Comando fallito: ${error.message}</p>`;
+        }
+    }
+
+    async sendPostcardCommand() {
+        const commandUrl = this.settings.postcardCommand;
+        if (!commandUrl || commandUrl.trim() === '') {
+            alert('Nessun comando Postcard configurato');
+            return;
+        }
+        
+        // Show FTP modal for feedback
+        this.ftpModal.classList.add('active');
+        this.ftpStatusIcon.textContent = 'mail';
+        this.ftpStatusIcon.style.color = 'var(--warning)';
+        this.ftpStatusText.textContent = 'Invio comando Postcard...';
+        this.ftpDetails.innerHTML = `<p>Comando: <strong>${commandUrl}</strong></p>`;
+        
+        try {
+            const response = await fetch('/api/http-command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: commandUrl.trim() })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.ftpStatusIcon.textContent = 'check_circle';
+                this.ftpStatusIcon.style.color = 'var(--accent-primary)';
+                this.ftpStatusText.textContent = 'Comando Postcard inviato!';
+                this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ Comando inviato con successo</p>`;
+            } else {
+                throw new Error(result.error || 'Errore sconosciuto');
+            }
+        } catch (error) {
+            console.error('Postcard Error:', error);
+            this.ftpStatusIcon.textContent = 'error';
+            this.ftpStatusIcon.style.color = 'var(--danger)';
+            this.ftpStatusText.textContent = 'Errore invio Postcard';
+            this.ftpDetails.innerHTML += `<p style="color: var(--danger); margin-top: 8px;">Errore: ${error.message}</p>`;
         }
     }
 
