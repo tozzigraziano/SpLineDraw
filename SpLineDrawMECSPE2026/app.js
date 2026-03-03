@@ -2612,33 +2612,52 @@ class SpLineDrawMECSPE {
 
     async sendDoutCommand(doutIndex, label) {
         const host = this.settings.ftpHost || '192.168.0.21';
-        const commandUrl = `http://${host}/KCL/SET PORT DOUT[${doutIndex}] = ON`;
+        const onUrl = `http://${host}/KCL/SET PORT DOUT[${doutIndex}] = ON`;
+        const offUrl = `http://${host}/KCL/SET PORT DOUT[${doutIndex}] = OFF`;
         
         // Show feedback in FTP modal
         this.cmdModal.classList.remove('active');
         this.ftpModal.classList.add('active');
         this.ftpStatusIcon.textContent = 'terminal';
         this.ftpStatusIcon.style.color = 'var(--warning)';
-        this.ftpStatusText.textContent = `Invio comando ${label}...`;
-        this.ftpDetails.innerHTML = `<p>DOUT[${doutIndex}] = ON</p><p>URL: <strong>${commandUrl}</strong></p>`;
+        this.ftpStatusText.textContent = `Invio impulso ${label}...`;
+        this.ftpDetails.innerHTML = `<p>DOUT[${doutIndex}] impulso (ON → 1s → OFF)</p>`;
         
         try {
-            const response = await fetch('/api/http-command', {
+            // Send ON
+            const onResponse = await fetch('/api/http-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: commandUrl.trim() })
+                body: JSON.stringify({ url: onUrl.trim() })
             });
+            const onResult = await onResponse.json();
             
-            const result = await response.json();
-            
-            if (result.success) {
-                this.ftpStatusIcon.textContent = 'check_circle';
-                this.ftpStatusIcon.style.color = 'var(--accent-primary)';
-                this.ftpStatusText.textContent = `Comando ${label} inviato!`;
-                this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ DOUT[${doutIndex}] = ON inviato con successo</p>`;
-            } else {
-                throw new Error(result.error || 'Errore sconosciuto');
+            if (!onResult.success) {
+                throw new Error(onResult.error || 'Errore invio ON');
             }
+            
+            this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 4px;">✓ DOUT[${doutIndex}] = ON</p>`;
+            this.ftpStatusText.textContent = `Attesa 1s prima di OFF...`;
+            
+            // Wait 1 second
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Send OFF
+            const offResponse = await fetch('/api/http-command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: offUrl.trim() })
+            });
+            const offResult = await offResponse.json();
+            
+            if (!offResult.success) {
+                throw new Error(offResult.error || 'Errore invio OFF');
+            }
+            
+            this.ftpStatusIcon.textContent = 'check_circle';
+            this.ftpStatusIcon.style.color = 'var(--accent-primary)';
+            this.ftpStatusText.textContent = `Impulso ${label} completato!`;
+            this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 4px;">✓ DOUT[${doutIndex}] = OFF</p>`;
         } catch (error) {
             console.error('DOUT Command Error:', error);
             this.ftpStatusIcon.textContent = 'error';
