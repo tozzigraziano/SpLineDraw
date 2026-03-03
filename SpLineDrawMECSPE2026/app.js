@@ -42,7 +42,7 @@ class SpLineDrawMECSPE {
             maxAxis2: 100,
             gridSize: 10,
             snapSize: 1,
-            enableSnap: true,
+            enableSnap: false,
             
             // Path processing
             smoothingFactor: 0.3,
@@ -75,6 +75,21 @@ class SpLineDrawMECSPE {
             ftpRemotePath: '/md:',
             postUploadCommand: 'http://192.168.0.21/KCL/SET PORT DOUT[1] = ON',
             postcardCommand: 'http://192.168.0.21/KCL/SET PORT DOUT[2] = ON',
+            
+            // DOUT CMD labels (3-15)
+            dout3Label: 'CLEAR ALARM',
+            dout4Label: 'STOP',
+            dout5Label: 'START',
+            dout6Label: '',
+            dout7Label: '',
+            dout8Label: '',
+            dout9Label: '',
+            dout10Label: '',
+            dout11Label: '',
+            dout12Label: '',
+            dout13Label: '',
+            dout14Label: '',
+            dout15Label: '',
             
             // Colors
             pathColor: '#666666',
@@ -145,6 +160,7 @@ class SpLineDrawMECSPE {
         // Modals
         this.settingsModal = document.getElementById('settingsModal');
         this.transitionModal = document.getElementById('transitionModal');
+        this.cmdModal = document.getElementById('cmdModal');
         
         // Buttons
         this.settingsBtn = document.getElementById('settingsBtn');
@@ -153,6 +169,7 @@ class SpLineDrawMECSPE {
         this.fileInput = document.getElementById('fileInput');
         this.sendFtpBtn = document.getElementById('sendFtpBtn');
         this.postcardBtn = document.getElementById('postcardBtn');
+        this.cmdBtn = document.getElementById('cmdBtn');
         
         // FTP Modal
         this.ftpModal = document.getElementById('ftpModal');
@@ -230,6 +247,20 @@ class SpLineDrawMECSPE {
             ftpPassword: document.getElementById('ftpPassword'),
             ftpRemotePath: document.getElementById('ftpRemotePath'),
             postUploadCommand: document.getElementById('postUploadCommand'),
+            // DOUT CMD labels
+            dout3Label: document.getElementById('dout3Label'),
+            dout4Label: document.getElementById('dout4Label'),
+            dout5Label: document.getElementById('dout5Label'),
+            dout6Label: document.getElementById('dout6Label'),
+            dout7Label: document.getElementById('dout7Label'),
+            dout8Label: document.getElementById('dout8Label'),
+            dout9Label: document.getElementById('dout9Label'),
+            dout10Label: document.getElementById('dout10Label'),
+            dout11Label: document.getElementById('dout11Label'),
+            dout12Label: document.getElementById('dout12Label'),
+            dout13Label: document.getElementById('dout13Label'),
+            dout14Label: document.getElementById('dout14Label'),
+            dout15Label: document.getElementById('dout15Label'),
             // Interface
             showSidePanel: document.getElementById('showSidePanel'),
             playbackBar: document.getElementById('playbackBar'),
@@ -279,6 +310,9 @@ class SpLineDrawMECSPE {
         
         // Postcard - send draw command to robot
         this.postcardBtn.addEventListener('click', () => this.sendPostcardCommand());
+        
+        // CMD - open DOUT commands modal
+        this.cmdBtn.addEventListener('click', () => this.openCmdModal());
         
         // FTP Modal close
         this.ftpCloseBtn.addEventListener('click', () => {
@@ -359,8 +393,13 @@ class SpLineDrawMECSPE {
         this.canvasContainer.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
         this.canvasContainer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
         
+        // CMD Modal close
+        document.getElementById('cmdCloseBtn').addEventListener('click', () => {
+            this.cmdModal.classList.remove('active');
+        });
+        
         // Modal click outside
-        [this.settingsModal, this.transitionModal, this.ftpModal].forEach(modal => {
+        [this.settingsModal, this.transitionModal, this.ftpModal, this.cmdModal].forEach(modal => {
             if (modal) {
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
@@ -2541,6 +2580,71 @@ class SpLineDrawMECSPE {
             }
         } catch (error) {
             this.ftpDetails.innerHTML += `<p style="color: var(--warning);">⚠ Comando fallito: ${error.message}</p>`;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CMD Modal (DOUT[3]-DOUT[15])
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    openCmdModal() {
+        const container = document.getElementById('cmdButtonsContainer');
+        const noButtonsMsg = document.getElementById('cmdNoButtons');
+        container.innerHTML = '';
+        
+        let hasButtons = false;
+        
+        for (let i = 3; i <= 15; i++) {
+            const label = this.settings[`dout${i}Label`];
+            if (label && label.trim() !== '') {
+                hasButtons = true;
+                const btn = document.createElement('button');
+                btn.className = 'btn cmd-dout-btn';
+                btn.innerHTML = `${label.trim()} <small>(DOUT[${i}])</small>`;
+                btn.addEventListener('click', () => this.sendDoutCommand(i, label.trim()));
+                container.appendChild(btn);
+            }
+        }
+        
+        noButtonsMsg.style.display = hasButtons ? 'none' : 'block';
+        this.cmdModal.classList.add('active');
+    }
+
+    async sendDoutCommand(doutIndex, label) {
+        const host = this.settings.ftpHost || '192.168.0.21';
+        const commandUrl = `http://${host}/KCL/SET PORT DOUT[${doutIndex}] = ON`;
+        
+        // Show feedback in FTP modal
+        this.cmdModal.classList.remove('active');
+        this.ftpModal.classList.add('active');
+        this.ftpStatusIcon.textContent = 'terminal';
+        this.ftpStatusIcon.style.color = 'var(--warning)';
+        this.ftpStatusText.textContent = `Invio comando ${label}...`;
+        this.ftpDetails.innerHTML = `<p>DOUT[${doutIndex}] = ON</p><p>URL: <strong>${commandUrl}</strong></p>`;
+        
+        try {
+            const response = await fetch('/api/http-command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: commandUrl.trim() })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.ftpStatusIcon.textContent = 'check_circle';
+                this.ftpStatusIcon.style.color = 'var(--accent-primary)';
+                this.ftpStatusText.textContent = `Comando ${label} inviato!`;
+                this.ftpDetails.innerHTML += `<p class="text-accent" style="margin-top: 8px;">✓ DOUT[${doutIndex}] = ON inviato con successo</p>`;
+            } else {
+                throw new Error(result.error || 'Errore sconosciuto');
+            }
+        } catch (error) {
+            console.error('DOUT Command Error:', error);
+            this.ftpStatusIcon.textContent = 'error';
+            this.ftpStatusIcon.style.color = 'var(--danger)';
+            this.ftpStatusText.textContent = `Errore invio DOUT[${doutIndex}]`;
+            this.ftpDetails.innerHTML += `<p style="color: var(--danger); margin-top: 8px;">Errore: ${error.message}</p>`;
         }
     }
 

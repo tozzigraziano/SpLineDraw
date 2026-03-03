@@ -1264,3 +1264,65 @@ input[type="checkbox"] {
     background: linear-gradient(135deg, #ff8533, #ffaa33) !important;
     box-shadow: 0 2px 8px rgba(255, 107, 0, 0.3);
 }
+
+/* CMD Button */
+#cmdBtn {
+    background: linear-gradient(135deg, #5b6abf, #7c8ae6) !important;
+    border-color: #5b6abf !important;
+}
+
+#cmdBtn:hover {
+    background: linear-gradient(135deg, #6f7dd4, #9aa2f0) !important;
+    box-shadow: 0 2px 8px rgba(91, 106, 191, 0.3);
+}
+
+/* CMD Modal */
+.cmd-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cmd-dout-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.cmd-dout-btn:hover {
+    background: var(--bg-hover);
+    border-color: #5b6abf;
+    box-shadow: 0 2px 8px rgba(91, 106, 191, 0.2);
+}
+
+.cmd-dout-btn:active {
+    transform: scale(0.98);
+}
+
+.cmd-dout-btn .material-symbols-outlined {
+    font-size: 20px;
+    color: #7c8ae6;
+}
+
+.cmd-dout-btn small {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.cmd-no-buttons {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 10px;
+}

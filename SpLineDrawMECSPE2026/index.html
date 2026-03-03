@@ -51,6 +51,12 @@
                     Postcard
                 </button>
                 
+                <!-- CMD - Comandi DOUT aggiuntivi -->
+                <button id="cmdBtn" class="btn toolbar-btn btn-export" title="Comandi DOUT[3]-DOUT[15]">
+                    <span class="material-symbols-outlined">terminal</span>
+                    CMD
+                </button>
+                
                 <!-- Playback -->
                 <div class="toolbar-section">
                     <div class="playback-group">
@@ -350,6 +356,64 @@
                         </div>
                     </div>
                     
+                    <!-- Comandi DOUT -->
+                    <div class="settings-section">
+                        <h3>Comandi DOUT (CMD)</h3>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">Inserisci la descrizione per ogni DOUT. Lascia vuoto per nascondere il pulsante.</p>
+                        <div class="setting-row">
+                            <label for="dout3Label">DOUT[3]:</label>
+                            <input type="text" id="dout3Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout4Label">DOUT[4]:</label>
+                            <input type="text" id="dout4Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout5Label">DOUT[5]:</label>
+                            <input type="text" id="dout5Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout6Label">DOUT[6]:</label>
+                            <input type="text" id="dout6Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout7Label">DOUT[7]:</label>
+                            <input type="text" id="dout7Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout8Label">DOUT[8]:</label>
+                            <input type="text" id="dout8Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout9Label">DOUT[9]:</label>
+                            <input type="text" id="dout9Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout10Label">DOUT[10]:</label>
+                            <input type="text" id="dout10Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout11Label">DOUT[11]:</label>
+                            <input type="text" id="dout11Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout12Label">DOUT[12]:</label>
+                            <input type="text" id="dout12Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout13Label">DOUT[13]:</label>
+                            <input type="text" id="dout13Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout14Label">DOUT[14]:</label>
+                            <input type="text" id="dout14Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                        <div class="setting-row">
+                            <label for="dout15Label">DOUT[15]:</label>
+                            <input type="text" id="dout15Label" placeholder="Descrizione..." style="width: 180px;">
+                        </div>
+                    </div>
+                    
                     <!-- Interfaccia -->
                     <div class="settings-section">
                         <h3>Interfaccia</h3>
@@ -408,6 +472,25 @@
                 </div>
                 <div class="modal-footer">
                     <button id="ftpCloseBtn" class="btn btn-primary">Chiudi</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CMD Modal -->
+        <div id="cmdModal" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Comandi DOUT</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="cmdButtonsContainer" class="cmd-buttons-container">
+                        <!-- Buttons generated dynamically -->
+                    </div>
+                    <p id="cmdNoButtons" class="cmd-no-buttons" style="display:none;">Nessun comando configurato. Vai nelle Impostazioni per aggiungere le descrizioni dei comandi DOUT.</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="cmdCloseBtn" class="btn btn-primary">Chiudi</button>
                 </div>
             </div>
         </div>
